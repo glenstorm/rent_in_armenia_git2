@@ -33,25 +33,28 @@ def process_page(district_num, page_num):
 
 if __name__ == "__main__":
 	# update currency rates
+	rates = CurrencyRates()
 	try:
-		connection = sqlite3.connect('real_estate.db')
-		# cur = connection.cursor()
-		# cur.execute("REPLACE INTO CURRENCIES (cur_date, usd_rate, eur_rate) VALUES (?, ?, ?)", (CurrencyRates.get_rates()))
-		# connection.commit()
+		with sqlite3.connect('real_estate.db') as connection:
+			currencies = rates.get_rates(connection)
 
-		# districts = ['Yerevan', 'Achapnyack', 'Arabkir', 'Avan', 'Davidashen', 'Erebuni', 'Zeitun_Kanaker', 'Kentron', 'Malatia_Sebastia', 'Nor_Nork', 'Nork_Marash', 'Nubarashen', 'Shengavit']
-		for district_id in range(2, len(districts)):
-			for y in range(1, 21):
-				content = process_page(district_id, y)
-				if content:
-					district = PageParser.transform(content, district_id, CurrencyRates.get_rates())
-					district.flush_to_db(connection)
-					exit()
+			for district_id in range(2, len(districts)):
+				for y in range(1, 21):
+					content = process_page(district_id, y)
+					if content:
+						district = PageParser.transform(content, district_id, currencies)
+						district.flush_to_db(connection)
+						exit()
 					# district.print_apartments()
 					# text_file = open("{0}-{1}.html".format(districts[x-1], y), "w")
 					# n = text_file.write(content)
 					# text_file.close()
-				else:
-					break;
+					else:
+						break;
+
+	except sqlite3.Error as error:
+		print("Error while creating a sqlite table", error)
 	finally:
-		connection.close()
+		if connection:
+			connection.close()
+			print("sqlite connection is closed")
