@@ -20,6 +20,7 @@ CREATE TABLE REAL_ESTATE (
 	is_agent INTEGER,
 	region_id INTEGER,
 	price INTEGER NOT NULL,
+	price_per_square REAL NOT NULL,
 	room_num INTEGER NOT NULL,
 	address TEXT NOT NULL,
 	link TEXT NOT NULL,

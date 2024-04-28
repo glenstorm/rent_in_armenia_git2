@@ -19,6 +19,6 @@ class District:
 	def flush_to_db(self, connection):
 		cur = connection.cursor()
 		for x in self.apartments:
-			cur.execute("INSERT INTO REAL_ESTATE (square, is_agent, region_id, price, room_num, address, link) VALUES (?, ?, ?, ?, ?, ?, ?)", (x.square, x.is_agent, self.id, x.price, x.room_num, x.address, x.link))
+			cur.execute("INSERT INTO REAL_ESTATE (square, is_agent, region_id, price, price_per_square, room_num, address, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (x.square, x.is_agent, self.id, x.price, x.price/float(x.square), x.room_num, x.address, x.link))
 
 		connection.commit()
