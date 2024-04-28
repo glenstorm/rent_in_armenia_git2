@@ -7,7 +7,7 @@ app = Dash(__name__)
 
 
 app.layout = html.Div([
-	html.H4("Analysis of the restaurant's revenue"),
+	html.H4("Analysis of the rent statistics in Yerevan"),
 	html.P("x-axis:"),
 	dcc.Checklist(
 		id='box-plots-x-x-axis',
