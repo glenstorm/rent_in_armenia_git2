@@ -28,20 +28,27 @@ def _parse_iso(raw):
 
 
 def _listing_stats(db_path, progress_finished_at=None):
+    empty = {"count": 0, "latest_scrape": None, "by_district": []}
     path = Path(db_path)
     if not path.exists():
-        return {"count": 0, "latest_scrape": None, "regions": 0}
+        return empty
 
     with sqlite3.connect(path) as connection:
         cur = connection.cursor()
         try:
             count = cur.execute("SELECT COUNT(*) FROM REAL_ESTATE").fetchone()[0]
-            regions = cur.execute(
-                "SELECT COUNT(DISTINCT region_id) FROM REAL_ESTATE"
-            ).fetchone()[0]
+            by_district = cur.execute(
+                """
+                SELECT g.region_name, COUNT(r.id) AS listing_count
+                FROM REAL_ESTATE r
+                JOIN REGION g ON g.id = r.region_id
+                GROUP BY g.id, g.region_name
+                ORDER BY g.id
+                """
+            ).fetchall()
             latest_raw = latest_scrape_finished_at(connection)
         except sqlite3.Error:
-            return {"count": 0, "latest_scrape": None, "regions": 0}
+            return empty
 
     candidates = []
     for raw in (latest_raw, progress_finished_at):
@@ -58,7 +65,9 @@ def _listing_stats(db_path, progress_finished_at=None):
     return {
         "count": count,
         "latest_scrape": latest_scrape,
-        "regions": regions,
+        "by_district": [
+            {"name": name, "count": listing_count} for name, listing_count in by_district
+        ],
     }
 
 

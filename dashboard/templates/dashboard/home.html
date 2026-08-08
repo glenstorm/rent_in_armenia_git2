@@ -53,6 +53,28 @@
     }
     .stats strong { display: block; font-size: 1.25rem; }
     .stats span { color: var(--muted); font-size: 0.9rem; }
+    .district-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem 1rem;
+      margin: 0 0 1rem;
+      padding: 0;
+      list-style: none;
+    }
+    .district-stats li {
+      background: #f7f3ea;
+      border: 1px solid #e2d9c8;
+      border-radius: 8px;
+      padding: 0.65rem 0.8rem;
+    }
+    .district-stats strong {
+      display: block;
+      font-size: 1.2rem;
+    }
+    .district-stats span {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
     .row {
       display: flex;
       flex-wrap: wrap;
@@ -138,15 +160,19 @@
     {% endif %}
 
     <section class="panel">
+      {% if stats.by_district %}
+        <ul class="district-stats">
+          {% for district in stats.by_district %}
+            <li>
+              <strong>{{ district.count }}</strong>
+              <span>{{ district.name }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="meta">No listings gathered yet.</p>
+      {% endif %}
       <ul class="stats">
-        <li>
-          <strong id="stat-count">{{ stats.count }}</strong>
-          <span>listings</span>
-        </li>
-        <li>
-          <strong>{{ stats.regions|default:"—" }}</strong>
-          <span>regions with data</span>
-        </li>
         <li>
           <strong>{{ stats.latest_scrape|default:"—" }}</strong>
           <span>latest scrape</span>
