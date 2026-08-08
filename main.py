@@ -41,22 +41,40 @@ if __name__ == "__main__":
     rates = CurrencyRates()
     try:
         with sqlite3.connect("real_estate.db") as connection:
+            print("Loading currency rates...", flush=True)
             currencies = rates.get_rates(connection)
+            print(f"Rates ready: USD={currencies[1]}, EUR={currencies[2]}", flush=True)
 
+            total_saved = 0
             # URL n is 1-based: 2..13 are districts (skip city-wide Yerevan = 1)
-            for district_id in range(2, len(districts) + 1):
+            district_ids = range(2, len(districts) + 1)
+            for district_id in district_ids:
+                name = districts[district_id - 1]
+                print(f"\n[{district_id - 1}/{len(districts) - 1}] {name}", flush=True)
+                district_saved = 0
+
                 for page_num in range(1, 21):
                     if page_num > 1 or district_id > 2:
                         time.sleep(REQUEST_DELAY_SEC)
+
+                    print(f"  page {page_num}...", end=" ", flush=True)
                     content = process_page(district_id, page_num)
-                    if content:
-                        district = PageParser.transform(
-                            content, district_id, currencies
-                        )
-                        district.flush_to_db(connection)
-                    else:
-                        # None = end of results for this district (or hard failure)
+                    if not content:
+                        print("no more pages", flush=True)
                         break
+
+                    district = PageParser.transform(
+                        content, district_id, currencies
+                    )
+                    count = len(district.apartments)
+                    district.flush_to_db(connection)
+                    district_saved += count
+                    total_saved += count
+                    print(f"{count} listings", flush=True)
+
+                print(f"  done: {district_saved} listings from {name}", flush=True)
+
+            print(f"\nFinished. Total listings processed: {total_saved}", flush=True)
 
     except sqlite3.Error as error:
         print("Error while working with sqlite database:", error)
