@@ -20,11 +20,15 @@
 
 
 import sqlite3
+import time
 
 from city import districts
 from currency_rates import CurrencyRates
 from page_parser import PageParser
 from web_page import WebPage
+
+# Pause between requests so list.am is less likely to return 429
+REQUEST_DELAY_SEC = 2.0
 
 
 def process_page(district_num, page_num):
@@ -42,6 +46,8 @@ if __name__ == "__main__":
             # URL n is 1-based: 2..13 are districts (skip city-wide Yerevan = 1)
             for district_id in range(2, len(districts) + 1):
                 for page_num in range(1, 21):
+                    if page_num > 1 or district_id > 2:
+                        time.sleep(REQUEST_DELAY_SEC)
                     content = process_page(district_id, page_num)
                     if content:
                         district = PageParser.transform(
@@ -49,6 +55,7 @@ if __name__ == "__main__":
                         )
                         district.flush_to_db(connection)
                     else:
+                        # None = end of results for this district (or hard failure)
                         break
 
     except sqlite3.Error as error:
