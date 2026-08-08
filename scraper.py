@@ -6,6 +6,7 @@ import time
 from city import districts
 from currency_rates import CurrencyRates
 from page_parser import PageParser
+from scrape_meta import ensure_scrape_runs_table, record_scrape_run
 from web_page import WebPage
 
 REQUEST_DELAY_SEC = 2.0
@@ -26,6 +27,7 @@ def run_scrape(db_path="real_estate.db", progress=print):
     total_saved = 0
 
     with sqlite3.connect(db_path) as connection:
+        ensure_scrape_runs_table(connection)
         progress("Loading currency rates...")
         currencies = rates.get_rates(connection)
         progress(f"Rates ready: USD={currencies[1]}, EUR={currencies[2]}")
@@ -55,5 +57,7 @@ def run_scrape(db_path="real_estate.db", progress=print):
 
             progress(f"  done: {district_saved} listings from {name}")
 
-    progress(f"\nFinished. Total listings processed: {total_saved}")
+        finished_at = record_scrape_run(connection, listings_processed=total_saved)
+
+    progress(f"\nFinished at {finished_at}. Total listings processed: {total_saved}")
     return total_saved
