@@ -42,7 +42,9 @@ def _listing_stats(db_path, progress_finished_at=None):
                 SELECT g.region_name, COUNT(r.id) AS listing_count
                 FROM REAL_ESTATE r
                 JOIN REGION g ON g.id = r.region_id
+                WHERE g.region_name != 'Yerevan'
                 GROUP BY g.id, g.region_name
+                HAVING COUNT(r.id) > 0
                 ORDER BY g.id
                 """
             ).fetchall()
