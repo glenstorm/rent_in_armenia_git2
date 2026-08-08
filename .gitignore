@@ -2,4 +2,7 @@ venv
 __pycache__
 .gitignore.swp
 *.db
+db.sqlite3
 lib64
+*.pyc
+.DS_Store

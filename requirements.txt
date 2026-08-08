@@ -4,3 +4,5 @@ numpy>=1.23.0
 pandas>=1.5.0
 plotly>=5.11.0
 dash>=2.7.0
+Django>=5.0,<6
+APScheduler>=3.10

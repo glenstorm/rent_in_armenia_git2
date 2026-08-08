@@ -72,8 +72,10 @@ class WebPage:
                 if e.code in (403, 429) and attempt + 1 < max_retries:
                     retry_after = e.headers.get("Retry-After")
                     try:
-                        wait = float(retry_after) if retry_after else retry_delay * (
-                            2**attempt
+                        wait = (
+                            float(retry_after)
+                            if retry_after
+                            else retry_delay * (2**attempt)
                         )
                     except ValueError:
                         wait = retry_delay * (2**attempt)

@@ -31,7 +31,12 @@ class CurrencyRates:
                     date = usd_data["date"]
                     usd = float(usd_data["rates"]["AMD"])
                     eur = float(eur_data["rates"]["AMD"])
-                except (requests.RequestException, KeyError, TypeError, ValueError) as e:
+                except (
+                    requests.RequestException,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ) as e:
                     raise RuntimeError(f"Failed to fetch currency rates: {e}") from e
 
                 cur.execute(
