@@ -5,29 +5,29 @@ from zoneinfo import ZoneInfo
 
 from django.conf import settings
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
 from charts import build_rent_box_figure
+from dashboard import scrape_progress
 from dashboard.scheduler import is_scrape_running, start_scrape_in_background
 from scrape_meta import latest_scrape_finished_at
 
 
-def _format_scrape_time(raw):
+def _parse_iso(raw):
     if not raw:
         return None
     try:
         dt = datetime.fromisoformat(raw)
     except ValueError:
-        return str(raw)
-
+        return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-    local = dt.astimezone(ZoneInfo(settings.TIME_ZONE))
-    return local.strftime("%Y-%m-%d %H:%M:%S %Z")
+    return dt
 
 
-def _listing_stats(db_path):
+def _listing_stats(db_path, progress_finished_at=None):
     path = Path(db_path)
     if not path.exists():
         return {"count": 0, "latest_scrape": None, "regions": 0}
@@ -43,9 +43,21 @@ def _listing_stats(db_path):
         except sqlite3.Error:
             return {"count": 0, "latest_scrape": None, "regions": 0}
 
+    candidates = []
+    for raw in (latest_raw, progress_finished_at):
+        dt = _parse_iso(raw)
+        if dt is not None:
+            candidates.append(dt)
+
+    latest_scrape = None
+    if candidates:
+        latest_scrape = max(candidates).astimezone(ZoneInfo(settings.TIME_ZONE)).strftime(
+            "%Y-%m-%d %H:%M:%S %Z"
+        )
+
     return {
         "count": count,
-        "latest_scrape": _format_scrape_time(latest_raw),
+        "latest_scrape": latest_scrape,
         "regions": regions,
     }
 
@@ -56,7 +68,8 @@ def home(request):
         y = "price"
 
     db_path = settings.RENT_DB_PATH
-    stats = _listing_stats(db_path)
+    progress = scrape_progress.snapshot()
+    stats = _listing_stats(db_path, progress_finished_at=progress.get("finished_at"))
     chart_html = ""
     if stats["count"]:
         fig = build_rent_box_figure(str(db_path), y=y)
@@ -70,6 +83,7 @@ def home(request):
             "y": y,
             "stats": stats,
             "scrape_running": is_scrape_running(),
+            "progress_lines": progress["lines"],
             "scrape_hour": settings.SCRAPE_CRON_HOUR,
             "scrape_minute": settings.SCRAPE_CRON_MINUTE,
             "timezone": settings.TIME_ZONE,
@@ -77,10 +91,16 @@ def home(request):
     )
 
 
+def scrape_status(request):
+    data = scrape_progress.snapshot()
+    data["running"] = is_scrape_running()
+    return JsonResponse(data)
+
+
 @require_POST
 def scrape_now(request):
     if start_scrape_in_background():
-        messages.info(request, "Scrape started in the background. Refresh later to see new data.")
+        messages.info(request, "Scrape started. Progress appears below.")
     else:
         messages.warning(request, "A scrape is already running.")
     return redirect("home")
