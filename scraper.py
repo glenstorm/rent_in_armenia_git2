@@ -6,6 +6,7 @@ import time
 from city import districts
 from currency_rates import CurrencyRates
 from page_parser import PageParser
+from listing_history import backfill_price_history, ensure_price_history_table
 from scrape_meta import ensure_scrape_runs_table, record_scrape_run
 from web_page import WebPage
 
@@ -30,6 +31,8 @@ def run_scrape(db_path="real_estate.db", progress=print):
     try:
         with sqlite3.connect(db_path) as connection:
             ensure_scrape_runs_table(connection)
+            ensure_price_history_table(connection)
+            backfill_price_history(connection)
             progress("Loading currency rates...")
             currencies = rates.get_rates(connection)
             progress(f"Rates ready: USD={currencies[1]}, EUR={currencies[2]}")

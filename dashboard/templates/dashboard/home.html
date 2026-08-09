@@ -120,6 +120,36 @@
       color: var(--muted);
     }
     .meta { color: var(--muted); font-size: 0.9rem; }
+    .section-title {
+      margin: 0 0 0.85rem;
+      font-size: 1.15rem;
+    }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin: 0 0 1rem;
+      padding: 0;
+      list-style: none;
+    }
+    .tabs a {
+      display: inline-block;
+      padding: 0.4rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #d9d2c4;
+      background: #f7f3ea;
+      color: var(--ink);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .tabs a:hover {
+      border-color: var(--accent);
+    }
+    .tabs a.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -163,6 +193,12 @@
 
     <section class="panel row">
       <form class="inline" method="get" action="{% url 'home' %}">
+        {% if selected_district %}
+          <input type="hidden" name="district" value="{{ selected_district }}">
+        {% endif %}
+        {% if selected_rooms %}
+          <input type="hidden" name="rooms" value="{{ selected_rooms }}">
+        {% endif %}
         <span>Y-axis:</span>
         <label>
           <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
@@ -177,13 +213,53 @@
     </section>
 
     <section class="panel">
+      <h2 class="section-title">Price trends by district</h2>
+      {% if districts %}
+        <ul class="tabs">
+          {% for name in districts %}
+            <li>
+              <a
+                class="{% if name == selected_district %}active{% endif %}"
+                href="{% url 'home' %}?y={{ y }}&amp;district={{ name|urlencode }}{% if selected_rooms %}&amp;rooms={{ selected_rooms|urlencode }}{% endif %}"
+              >{{ name }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if trend_html %}
+          {{ trend_html|safe }}
+        {% else %}
+          <p class="meta">No price history for this district yet.</p>
+        {% endif %}
+        <p class="meta">
+          Lines show min, Q1, median, Q3, and max over scrape dates.
+          More points appear after weekly scrapes.
+        </p>
+      {% else %}
+        <p class="meta">No districts with data yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <h2 class="section-title">Current distribution by rooms</h2>
+      {% if room_tabs %}
+        <ul class="tabs">
+          {% for rooms in room_tabs %}
+            <li>
+              <a
+                class="{% if rooms == selected_rooms %}active{% endif %}"
+                href="{% url 'home' %}?y={{ y }}&amp;rooms={{ rooms|urlencode }}{% if selected_district %}&amp;district={{ selected_district|urlencode }}{% endif %}"
+              >{{ rooms }} room{% if rooms != "1" %}s{% endif %}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
       {% if chart_html %}
         {{ chart_html|safe }}
       {% else %}
         <div class="empty">
           <p>No listings in the database yet.</p>
           <p>Run <code>python manage.py setup_db</code>, then
-            <code>python manage.py scrape_listings</code> (or wait for the daily scheduled scrape).</p>
+            <code>python manage.py scrape_listings</code> (or wait for the weekly scheduled scrape).</p>
         </div>
       {% endif %}
     </section>

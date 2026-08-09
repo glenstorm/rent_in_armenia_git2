@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 import numpy as np
 
 from city import districts
+from listing_history import record_price_history
 
 
 class District:
@@ -44,27 +47,65 @@ class District:
         self.__filter_data()
 
         cur = connection.cursor()
-        for x in self.apartments:
-            cur.execute("SELECT 1 FROM REAL_ESTATE WHERE link = ? LIMIT 1", (x.link,))
-            if cur.fetchone():
-                continue
+        scraped_at = datetime.now(timezone.utc).isoformat()
 
+        for x in self.apartments:
             cur.execute(
-                """
-                INSERT INTO REAL_ESTATE
-                (square, is_agent, region_id, price, price_per_square, room_num, address, link)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    x.square,
-                    x.is_agent,
-                    self.id,
-                    x.price,
-                    x.price_per_square,
-                    x.room_num,
-                    x.address,
-                    x.link,
-                ),
+                "SELECT id FROM REAL_ESTATE WHERE link = ? LIMIT 1",
+                (x.link,),
+            )
+            row = cur.fetchone()
+            if row:
+                listing_id = row[0]
+                cur.execute(
+                    """
+                    UPDATE REAL_ESTATE
+                    SET square = ?,
+                        is_agent = ?,
+                        region_id = ?,
+                        price = ?,
+                        price_per_square = ?,
+                        room_num = ?,
+                        address = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        x.square,
+                        x.is_agent,
+                        self.id,
+                        x.price,
+                        x.price_per_square,
+                        x.room_num,
+                        x.address,
+                        listing_id,
+                    ),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO REAL_ESTATE
+                    (square, is_agent, region_id, price, price_per_square, room_num, address, link)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        x.square,
+                        x.is_agent,
+                        self.id,
+                        x.price,
+                        x.price_per_square,
+                        x.room_num,
+                        x.address,
+                        x.link,
+                    ),
+                )
+                listing_id = cur.lastrowid
+
+            record_price_history(
+                connection,
+                listing_id=listing_id,
+                price=x.price,
+                price_per_square=x.price_per_square,
+                scraped_at=scraped_at,
             )
 
         connection.commit()

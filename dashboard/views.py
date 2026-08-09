@@ -6,7 +6,13 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.shortcuts import render
 
-from charts import build_rent_box_figure
+from charts import (
+    build_district_trend_figure,
+    build_rent_box_figure,
+    list_districts_with_data,
+    list_room_groups,
+    parse_room_group,
+)
 from scrape_meta import latest_scrape_finished_at
 
 
@@ -68,20 +74,41 @@ def home(request):
     if y not in ("price", "price_per_square"):
         y = "price"
 
-    db_path = settings.RENT_DB_PATH
+    db_path = str(settings.RENT_DB_PATH)
     stats = _listing_stats(db_path)
+    districts = list_districts_with_data(db_path) if stats["count"] else []
+    room_tabs = list_room_groups(db_path) if stats["count"] else []
+
+    district = request.GET.get("district") or (districts[0] if districts else None)
+    if district and district not in districts:
+        district = districts[0] if districts else None
+
+    room_param = request.GET.get("rooms") or (room_tabs[0] if room_tabs else None)
+    if room_param and room_param not in room_tabs:
+        room_param = room_tabs[0] if room_tabs else None
+    room_group = parse_room_group(room_param)
+
     chart_html = ""
+    trend_html = ""
     if stats["count"]:
-        fig = build_rent_box_figure(str(db_path), y=y)
+        fig = build_rent_box_figure(db_path, y=y, room_group=room_group)
         chart_html = fig.to_html(full_html=False, include_plotlyjs="cdn")
+        if district:
+            trend_fig = build_district_trend_figure(db_path, district, y=y)
+            trend_html = trend_fig.to_html(full_html=False, include_plotlyjs=False)
 
     return render(
         request,
         "dashboard/home.html",
         {
             "chart_html": chart_html,
+            "trend_html": trend_html,
             "y": y,
             "stats": stats,
+            "districts": districts,
+            "selected_district": district,
+            "room_tabs": room_tabs,
+            "selected_rooms": room_param,
             "scrape_day": settings.SCRAPE_CRON_DAY_OF_WEEK,
             "scrape_hour": settings.SCRAPE_CRON_HOUR,
             "scrape_minute": settings.SCRAPE_CRON_MINUTE,

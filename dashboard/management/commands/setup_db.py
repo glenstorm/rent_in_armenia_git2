@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from init_db import init_db
+from listing_history import backfill_price_history, ensure_price_history_table
 from scrape_meta import ensure_scrape_runs_table
 
 
@@ -36,6 +37,8 @@ class Command(BaseCommand):
                 except sqlite3.Error:
                     row = (0,)
                 ensure_scrape_runs_table(connection)
+                ensure_price_history_table(connection)
+                backfill_price_history(connection)
             if row and row[0] > 0:
                 self.stdout.write(
                     self.style.WARNING(
@@ -43,8 +46,12 @@ class Command(BaseCommand):
                         "(use --force to recreate)."
                     )
                 )
-                self.stdout.write("Ensured SCRAPE_RUNS table exists.")
+                self.stdout.write(
+                    "Ensured SCRAPE_RUNS and LISTING_PRICE_HISTORY tables exist."
+                )
                 return
 
         init_db(db_path=str(db_path), schema_path=str(schema_path))
+        with sqlite3.connect(db_path) as connection:
+            backfill_price_history(connection)
         self.stdout.write(self.style.SUCCESS(f"Initialized rent DB at {db_path}"))
