@@ -1,6 +1,6 @@
 from lxml import html
 
-from apartment import Apartment
+from apartment import Apartment, area_is_plausible
 from district import District
 
 
@@ -74,6 +74,8 @@ class PageParser:
                         continue
 
                     if square <= 0 or room_num <= 0:
+                        continue
+                    if not area_is_plausible(room_num, square):
                         continue
 
                     dc.add(

@@ -1,7 +1,24 @@
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from apartment import area_is_plausible
 from dashboard.bot_gate import SESSION_CODE_KEY, SESSION_ISSUED_KEY, SESSION_OK_KEY
+
+
+class AreaValidationTests(TestCase):
+    def test_rejects_tiny_and_huge_squares(self):
+        self.assertFalse(area_is_plausible(3, 5))
+        self.assertFalse(area_is_plausible(3, 3))
+        self.assertFalse(area_is_plausible(4, 8))
+        self.assertFalse(area_is_plausible(2, 640))
+        self.assertFalse(area_is_plausible(1, 14))
+
+    def test_accepts_normal_flats(self):
+        self.assertTrue(area_is_plausible(1, 40))
+        self.assertTrue(area_is_plausible(2, 55))
+        self.assertTrue(area_is_plausible(3, 90))
+        self.assertTrue(area_is_plausible(4, 120))
+        self.assertTrue(area_is_plausible(5, 180))
 
 
 @override_settings(BOT_GATE_ENABLED=True, BOT_GATE_MIN_SOLVE_SECONDS=0)
