@@ -1,0 +1,32 @@
+[Unit]
+Description=itsfreerealestate Django (gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+# Change User to the Linux account that owns /var/www/itsfreerealestate
+# (same as GitHub Actions secret DEPLOY_USER). Keep Group=www-data so nginx
+# can talk to the unix socket.
+User=deploy
+Group=www-data
+UMask=0002
+WorkingDirectory=/var/www/itsfreerealestate
+EnvironmentFile=/var/www/itsfreerealestate/.env
+ExecStart=/var/www/itsfreerealestate/.venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/run/itsfreerealestate/gunicorn.sock \
+    --timeout 120 \
+    --access-logfile /var/log/itsfreerealestate/access.log \
+    --error-logfile /var/log/itsfreerealestate/error.log \
+    rentweb.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+RuntimeDirectory=itsfreerealestate
+RuntimeDirectoryMode=0755
+LogsDirectory=itsfreerealestate
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

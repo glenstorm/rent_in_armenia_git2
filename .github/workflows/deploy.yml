@@ -1,0 +1,51 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run tests
+        env:
+          BOT_GATE_ENABLED: "0"
+          ENABLE_SCRAPE_SCHEDULER: "0"
+        run: python manage.py test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.DEPLOY_PATH }}"
+            if [ -z "$APP_DIR" ]; then
+              APP_DIR=/var/www/itsfreerealestate
+            fi
+            cd "$APP_DIR"
+            chmod +x deploy/deploy.sh
+            APP_DIR="$APP_DIR" ./deploy/deploy.sh

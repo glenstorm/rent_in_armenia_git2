@@ -7,11 +7,27 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-vseaajxf!_0wfe^7qj-3fg9f5^!n&879qt=q-40k4v9v)xzrh6"
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-vseaajxf!_0wfe^7qj-3fg9f5^!n&879qt=q-40k4v9v)xzrh6",
+)
 
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "1").lower() not in ("0", "false", "no", "off")
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "testserver"]
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        "127.0.0.1,localhost,testserver",
+    ).split(",")
+    if host.strip()
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -87,7 +103,12 @@ RENT_SCHEMA_PATH = BASE_DIR / "schema.sql"
 SCRAPE_CRON_DAY_OF_WEEK = "mon"  # mon..sun
 SCRAPE_CRON_HOUR = 0
 SCRAPE_CRON_MINUTE = 0
-ENABLE_SCRAPE_SCHEDULER = True
+# In-process APScheduler is for local runserver only. On the VPS use the
+# systemd timer in deploy/itsfreerealestate-scrape.timer instead.
+ENABLE_SCRAPE_SCHEDULER = os.environ.get(
+    "ENABLE_SCRAPE_SCHEDULER",
+    "1" if DEBUG else "0",
+).lower() not in ("0", "false", "no", "off")
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -113,5 +134,11 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Behind nginx TLS termination
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG

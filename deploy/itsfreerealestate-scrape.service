@@ -1,0 +1,13 @@
+[Unit]
+Description=itsfreerealestate weekly list.am scrape
+After=network.target
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/itsfreerealestate
+EnvironmentFile=/var/www/itsfreerealestate/.env
+ExecStart=/var/www/itsfreerealestate/.venv/bin/python manage.py scrape_listings
+Nice=10
+TimeoutStartSec=6h

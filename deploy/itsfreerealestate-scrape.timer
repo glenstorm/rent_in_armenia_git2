@@ -1,0 +1,11 @@
+[Unit]
+Description=Run itsfreerealestate scrape weekly (Monday 00:00 Asia/Yerevan)
+
+[Timer]
+Timezone=Asia/Yerevan
+OnCalendar=Mon *-*-* 00:00:00
+Persistent=true
+Unit=itsfreerealestate-scrape.service
+
+[Install]
+WantedBy=timers.target

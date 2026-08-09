@@ -6,3 +6,6 @@ db.sqlite3
 lib64
 *.pyc
 .DS_Store
+.env
+staticfiles/
+*.log
