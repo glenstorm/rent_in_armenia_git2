@@ -1,6 +1,6 @@
 import sqlite3
 
-from city import districts
+from city import DISTRICTS
 
 
 def init_db(db_path="real_estate.db", schema_path="schema.sql"):
@@ -10,10 +10,10 @@ def init_db(db_path="real_estate.db", schema_path="schema.sql"):
             connection.executescript(f.read())
 
         cur = connection.cursor()
-        for index, val in enumerate(districts):
+        for district_id, region_name in DISTRICTS.items():
             cur.execute(
                 "INSERT INTO REGION (id, region_name) VALUES (?, ?)",
-                (index + 1, val),
+                (district_id, region_name),
             )
         connection.commit()
     finally:

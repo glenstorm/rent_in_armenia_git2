@@ -3,7 +3,7 @@
 import sqlite3
 import time
 
-from city import districts
+from city import DISTRICTS, scrape_district_ids
 from currency_rates import CurrencyRates
 from page_parser import PageParser
 from listing_history import backfill_price_history, ensure_price_history_table
@@ -37,14 +37,14 @@ def run_scrape(db_path="real_estate.db", progress=print):
             currencies = rates.get_rates(connection)
             progress(f"Rates ready: USD={currencies[1]}, EUR={currencies[2]}")
 
-            district_ids = range(2, len(districts) + 1)
-            for district_id in district_ids:
-                name = districts[district_id - 1]
-                progress(f"\n[{district_id - 1}/{len(districts) - 1}] {name}")
+            district_ids = scrape_district_ids()
+            for index, district_id in enumerate(district_ids, start=1):
+                name = DISTRICTS[district_id]
+                progress(f"\n[{index}/{len(district_ids)}] {name} (n={district_id})")
                 district_saved = 0
 
                 for page_num in range(1, 21):
-                    if page_num > 1 or district_id > 2:
+                    if page_num > 1 or index > 1:
                         time.sleep(REQUEST_DELAY_SEC)
 
                     progress(f"  page {page_num}...")
@@ -55,6 +55,10 @@ def run_scrape(db_path="real_estate.db", progress=print):
 
                     district = PageParser.transform(content, district_id, currencies)
                     count = len(district.apartments)
+                    if count == 0:
+                        progress("  0 listings — skipping further pages")
+                        break
+
                     district.flush_to_db(connection)
                     district_saved += count
                     total_saved += count

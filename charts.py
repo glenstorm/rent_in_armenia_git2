@@ -35,6 +35,8 @@ def load_listings(db_path):
             SELECT r.*, g.region_name
             FROM REAL_ESTATE r
             LEFT JOIN REGION g ON g.id = r.region_id
+            WHERE g.region_name IS NOT NULL
+              AND g.region_name != 'Yerevan'
             """,
             connection,
         )

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from city import districts
+from city import district_name
 from listing_history import record_price_history
 
 
@@ -12,11 +12,9 @@ class District:
     """
 
     def __init__(self, id):
-        # URL / DB region ids are 1-based; districts list is 0-based
+        # id is the list.am `n` parameter / REGION.id
         self.id = id
-        if not 1 <= id <= len(districts):
-            raise ValueError(f"Invalid district id: {id}")
-        self.name = districts[self.id - 1]
+        self.name = district_name(id)
         self.apartments = []
 
     def add(self, apartment):

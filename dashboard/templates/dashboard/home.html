@@ -1,268 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yerevan rent statistics</title>
-  <style>
-    :root {
-      --bg: #f3efe6;
-      --ink: #1c2430;
-      --accent: #0f6e56;
-      --card: #fffdf8;
-      --muted: #5c6673;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Tahoma, sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at top left, #dceee7 0%, transparent 45%),
-        linear-gradient(160deg, var(--bg), #e7eef5);
-      min-height: 100vh;
-    }
-    main {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 2rem 1.25rem 3rem;
-    }
-    h1 {
-      margin: 0 0 0.35rem;
-      font-size: 1.9rem;
-      letter-spacing: -0.02em;
-    }
-    .lede {
-      margin: 0 0 1.5rem;
-      color: var(--muted);
-    }
-    .panel {
-      background: var(--card);
-      border: 1px solid #d9d2c4;
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 1.25rem;
-    }
-    .stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1.25rem;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .stats strong { display: block; font-size: 1.25rem; }
-    .stats span { color: var(--muted); font-size: 0.9rem; }
-    .district-stats {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.75rem 1rem;
-      margin: 0 0 1rem;
-      padding: 0;
-      list-style: none;
-    }
-    .district-stats li {
-      background: #f7f3ea;
-      border: 1px solid #e2d9c8;
-      border-radius: 8px;
-      padding: 0.65rem 0.8rem;
-    }
-    .district-stats strong {
-      display: block;
-      font-size: 1.2rem;
-    }
-    .district-stats span {
-      color: var(--muted);
-      font-size: 0.85rem;
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
-      align-items: center;
-      justify-content: space-between;
-    }
-    form.inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.85rem;
-      align-items: center;
-    }
-    label { cursor: pointer; }
-    button, .button {
-      background: var(--accent);
-      color: #fff;
-      border: 0;
-      border-radius: 8px;
-      padding: 0.55rem 1rem;
-      cursor: pointer;
-      font: inherit;
-    }
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .messages {
-      list-style: none;
-      margin: 0 0 1rem;
-      padding: 0;
-    }
-    .messages li {
-      background: #e7f5ef;
-      border: 1px solid #b7dccb;
-      border-radius: 8px;
-      padding: 0.65rem 0.9rem;
-      margin-bottom: 0.5rem;
-    }
-    .empty {
-      padding: 2rem;
-      text-align: center;
-      color: var(--muted);
-    }
-    .meta { color: var(--muted); font-size: 0.9rem; }
-    .section-title {
-      margin: 0 0 0.85rem;
-      font-size: 1.15rem;
-    }
-    .tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      margin: 0 0 1rem;
-      padding: 0;
-      list-style: none;
-    }
-    .tabs a {
-      display: inline-block;
-      padding: 0.4rem 0.75rem;
-      border-radius: 8px;
-      border: 1px solid #d9d2c4;
-      background: #f7f3ea;
-      color: var(--ink);
-      text-decoration: none;
-      font-size: 0.9rem;
-    }
-    .tabs a:hover {
-      border-color: var(--accent);
-    }
-    .tabs a.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Yerevan rent statistics</h1>
-    <p class="lede">Listings gathered from list.am, charted by region and room count.</p>
+{% extends "dashboard/base.html" %}
 
-    {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
+{% block title %}Overview — Yerevan rent statistics{% endblock %}
+{% block lede %}Listings gathered from list.am. Open a page below for charts.{% endblock %}
 
-    <section class="panel">
-      {% if stats.by_district %}
-        <ul class="district-stats">
-          {% for district in stats.by_district %}
-            <li>
-              <strong>{{ district.count }}</strong>
-              <span>{{ district.name }}</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="meta">No listings gathered yet.</p>
-      {% endif %}
-      <ul class="stats">
+{% block content %}
+<section class="panel">
+  {% if stats.by_district %}
+    <ul class="district-stats">
+      {% for district in stats.by_district %}
         <li>
-          <strong>{{ stats.latest_scrape|default:"—" }}</strong>
-          <span>latest scrape</span>
+          <strong>{{ district.count }}</strong>
+          <span>{{ district.name }}</span>
         </li>
-      </ul>
-      <p class="meta" style="margin: 1rem 0 0;">
-        Weekly scrape scheduled on {{ scrape_day }} at
-        {{ scrape_hour|stringformat:"02d" }}:{{ scrape_minute|stringformat:"02d" }}
-        ({{ timezone }}).
-      </p>
-    </section>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="meta">No listings gathered yet.</p>
+  {% endif %}
+  <ul class="stats">
+    <li>
+      <strong>{{ stats.latest_scrape|default:"—" }}</strong>
+      <span>latest scrape</span>
+    </li>
+  </ul>
+  <p class="meta" style="margin: 1rem 0 0;">
+    Weekly scrape scheduled on {{ scrape_day }} at
+    {{ scrape_hour|stringformat:"02d" }}:{{ scrape_minute|stringformat:"02d" }}
+    ({{ timezone }}).
+  </p>
+</section>
 
-    <section class="panel row">
-      <form class="inline" method="get" action="{% url 'home' %}">
-        {% if selected_district %}
-          <input type="hidden" name="district" value="{{ selected_district }}">
-        {% endif %}
-        {% if selected_rooms %}
-          <input type="hidden" name="rooms" value="{{ selected_rooms }}">
-        {% endif %}
-        <span>Y-axis:</span>
-        <label>
-          <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
-          price
-        </label>
-        <label>
-          <input type="radio" name="y" value="price_per_square" {% if y == "price_per_square" %}checked{% endif %}>
-          price per m²
-        </label>
-        <button type="submit">Update chart</button>
-      </form>
-    </section>
+<section class="panel">
+  <h2 class="section-title">Charts</h2>
+  <div class="page-cards">
+    <a href="{% url 'trends' %}">
+      <strong>Price trends by district</strong>
+      <span>Min, Q1, median, Q3, and max over time for each district.</span>
+    </a>
+    <a href="{% url 'distribution' %}">
+      <strong>Current distribution by rooms</strong>
+      <span>Box plots of prices by district for 1, 2, 3, 4, and 5+ rooms.</span>
+    </a>
+  </div>
+</section>
 
-    <section class="panel">
-      <h2 class="section-title">Price trends by district</h2>
-      {% if districts %}
-        <ul class="tabs">
-          {% for name in districts %}
-            <li>
-              <a
-                class="{% if name == selected_district %}active{% endif %}"
-                href="{% url 'home' %}?y={{ y }}&amp;district={{ name|urlencode }}{% if selected_rooms %}&amp;rooms={{ selected_rooms|urlencode }}{% endif %}"
-              >{{ name }}</a>
-            </li>
-          {% endfor %}
-        </ul>
-        {% if trend_html %}
-          {{ trend_html|safe }}
-        {% else %}
-          <p class="meta">No price history for this district yet.</p>
-        {% endif %}
-        <p class="meta">
-          Lines show min, Q1, median, Q3, and max over scrape dates.
-          More points appear after weekly scrapes.
-        </p>
-      {% else %}
-        <p class="meta">No districts with data yet.</p>
-      {% endif %}
-    </section>
-
-    <section class="panel">
-      <h2 class="section-title">Current distribution by rooms</h2>
-      {% if room_tabs %}
-        <ul class="tabs">
-          {% for rooms in room_tabs %}
-            <li>
-              <a
-                class="{% if rooms == selected_rooms %}active{% endif %}"
-                href="{% url 'home' %}?y={{ y }}&amp;rooms={{ rooms|urlencode }}{% if selected_district %}&amp;district={{ selected_district|urlencode }}{% endif %}"
-              >{{ rooms }} room{% if rooms != "1" %}s{% endif %}</a>
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
-      {% if chart_html %}
-        {{ chart_html|safe }}
-      {% else %}
-        <div class="empty">
-          <p>No listings in the database yet.</p>
-          <p>Run <code>python manage.py setup_db</code>, then
-            <code>python manage.py scrape_listings</code> (or wait for the weekly scheduled scrape).</p>
-        </div>
-      {% endif %}
-    </section>
-  </main>
-</body>
-</html>
+{% if not stats.count %}
+<section class="panel">
+  <div class="empty">
+    <p>No listings in the database yet.</p>
+    <p>Run <code>python manage.py setup_db</code>, then
+      <code>python manage.py scrape_listings</code> (or wait for the weekly scheduled scrape).</p>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

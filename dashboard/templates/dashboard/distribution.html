@@ -1,0 +1,49 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Current distribution by rooms — Yerevan rent statistics{% endblock %}
+{% block lede %}Current rent distribution by district for each room count.{% endblock %}
+
+{% block content %}
+<section class="panel row">
+  <form class="inline" method="get" action="{% url 'distribution' %}">
+    {% if selected_rooms %}
+      <input type="hidden" name="rooms" value="{{ selected_rooms }}">
+    {% endif %}
+    <span>Y-axis:</span>
+    <label>
+      <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
+      price
+    </label>
+    <label>
+      <input type="radio" name="y" value="price_per_square" {% if y == "price_per_square" %}checked{% endif %}>
+      price per m²
+    </label>
+    <button type="submit">Update chart</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Current distribution by rooms</h2>
+  {% if room_tabs %}
+    <ul class="tabs">
+      {% for rooms in room_tabs %}
+        <li>
+          <a
+            class="{% if rooms == selected_rooms %}active{% endif %}"
+            href="{% url 'distribution' %}?y={{ y }}&amp;rooms={{ rooms|urlencode }}"
+          >{{ rooms }} room{% if rooms != "1" %}s{% endif %}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if chart_html %}
+    {{ chart_html|safe }}
+  {% else %}
+    <div class="empty">
+      <p>No listings in the database yet.</p>
+      <p>Run <code>python manage.py setup_db</code>, then
+        <code>python manage.py scrape_listings</code> (or wait for the weekly scheduled scrape).</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -28,6 +28,13 @@ def _parse_iso(raw):
     return dt
 
 
+def _parse_y(request):
+    y = request.GET.get("y", "price")
+    if y not in ("price", "price_per_square"):
+        return "price"
+    return y
+
+
 def _listing_stats(db_path):
     empty = {"count": 0, "latest_scrape": None, "by_district": []}
     path = Path(db_path)
@@ -37,7 +44,14 @@ def _listing_stats(db_path):
     with sqlite3.connect(path) as connection:
         cur = connection.cursor()
         try:
-            count = cur.execute("SELECT COUNT(*) FROM REAL_ESTATE").fetchone()[0]
+            count = cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM REAL_ESTATE r
+                JOIN REGION g ON g.id = r.region_id
+                WHERE g.region_name != 'Yerevan'
+                """
+            ).fetchone()[0]
             by_district = cur.execute(
                 """
                 SELECT g.region_name, COUNT(r.id) AS listing_count
@@ -69,19 +83,63 @@ def _listing_stats(db_path):
     }
 
 
-def home(request):
-    y = request.GET.get("y", "price")
-    if y not in ("price", "price_per_square"):
-        y = "price"
+def _schedule_context():
+    return {
+        "scrape_day": settings.SCRAPE_CRON_DAY_OF_WEEK,
+        "scrape_hour": settings.SCRAPE_CRON_HOUR,
+        "scrape_minute": settings.SCRAPE_CRON_MINUTE,
+        "timezone": settings.TIME_ZONE,
+    }
 
+
+def home(request):
+    db_path = str(settings.RENT_DB_PATH)
+    stats = _listing_stats(db_path)
+    return render(
+        request,
+        "dashboard/home.html",
+        {
+            "nav": "home",
+            "stats": stats,
+            **_schedule_context(),
+        },
+    )
+
+
+def trends(request):
+    y = _parse_y(request)
     db_path = str(settings.RENT_DB_PATH)
     stats = _listing_stats(db_path)
     districts = list_districts_with_data(db_path) if stats["count"] else []
-    room_tabs = list_room_groups(db_path) if stats["count"] else []
 
     district = request.GET.get("district") or (districts[0] if districts else None)
     if district and district not in districts:
         district = districts[0] if districts else None
+
+    trend_html = ""
+    if district:
+        trend_fig = build_district_trend_figure(db_path, district, y=y)
+        trend_html = trend_fig.to_html(full_html=False, include_plotlyjs="cdn")
+
+    return render(
+        request,
+        "dashboard/trends.html",
+        {
+            "nav": "trends",
+            "y": y,
+            "districts": districts,
+            "selected_district": district,
+            "trend_html": trend_html,
+            **_schedule_context(),
+        },
+    )
+
+
+def distribution(request):
+    y = _parse_y(request)
+    db_path = str(settings.RENT_DB_PATH)
+    stats = _listing_stats(db_path)
+    room_tabs = list_room_groups(db_path) if stats["count"] else []
 
     room_param = request.GET.get("rooms") or (room_tabs[0] if room_tabs else None)
     if room_param and room_param not in room_tabs:
@@ -89,29 +147,19 @@ def home(request):
     room_group = parse_room_group(room_param)
 
     chart_html = ""
-    trend_html = ""
     if stats["count"]:
         fig = build_rent_box_figure(db_path, y=y, room_group=room_group)
         chart_html = fig.to_html(full_html=False, include_plotlyjs="cdn")
-        if district:
-            trend_fig = build_district_trend_figure(db_path, district, y=y)
-            trend_html = trend_fig.to_html(full_html=False, include_plotlyjs=False)
 
     return render(
         request,
-        "dashboard/home.html",
+        "dashboard/distribution.html",
         {
-            "chart_html": chart_html,
-            "trend_html": trend_html,
+            "nav": "distribution",
             "y": y,
-            "stats": stats,
-            "districts": districts,
-            "selected_district": district,
             "room_tabs": room_tabs,
             "selected_rooms": room_param,
-            "scrape_day": settings.SCRAPE_CRON_DAY_OF_WEEK,
-            "scrape_hour": settings.SCRAPE_CRON_HOUR,
-            "scrape_minute": settings.SCRAPE_CRON_MINUTE,
-            "timezone": settings.TIME_ZONE,
+            "chart_html": chart_html,
+            **_schedule_context(),
         },
     )

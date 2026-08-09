@@ -1,0 +1,51 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Price trends by district — Yerevan rent statistics{% endblock %}
+{% block lede %}How rent prices change over scrape dates for each district.{% endblock %}
+
+{% block content %}
+<section class="panel row">
+  <form class="inline" method="get" action="{% url 'trends' %}">
+    {% if selected_district %}
+      <input type="hidden" name="district" value="{{ selected_district }}">
+    {% endif %}
+    <span>Y-axis:</span>
+    <label>
+      <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
+      price
+    </label>
+    <label>
+      <input type="radio" name="y" value="price_per_square" {% if y == "price_per_square" %}checked{% endif %}>
+      price per m²
+    </label>
+    <button type="submit">Update chart</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Price trends by district</h2>
+  {% if districts %}
+    <ul class="tabs">
+      {% for name in districts %}
+        <li>
+          <a
+            class="{% if name == selected_district %}active{% endif %}"
+            href="{% url 'trends' %}?y={{ y }}&amp;district={{ name|urlencode }}"
+          >{{ name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if trend_html %}
+      {{ trend_html|safe }}
+    {% else %}
+      <p class="meta">No price history for this district yet.</p>
+    {% endif %}
+    <p class="meta">
+      Lines show min, Q1, median, Q3, and max over scrape dates.
+      More points appear after weekly scrapes.
+    </p>
+  {% else %}
+    <p class="meta">No districts with data yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
