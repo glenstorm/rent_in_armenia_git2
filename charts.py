@@ -4,6 +4,7 @@ import sqlite3
 
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # Distinct colors per room-group subplot (line, translucent fill)
 PLOT_COLORS = [
@@ -203,19 +204,20 @@ def list_districts_with_data(db_path):
 
 def build_district_trend_figure(db_path, district_name, y="price"):
     """
-    Time series for one district: min, Q1, median, Q3, max of price
-    (or price_per_square) from LISTING_PRICE_HISTORY.
+    Five time-series subplots for one district (rooms 1, 2, 3, 4, 5+).
+    Each shows min, Q1, median, Q3, max from LISTING_PRICE_HISTORY.
     """
     if y not in ("price", "price_per_square"):
         y = "price"
 
     y_label = "price" if y == "price" else "price per m²"
+    room_groups = [1, 2, 3, 4, LARGE_ROOM_GROUP]
 
     with sqlite3.connect(db_path) as connection:
         try:
             hist = pd.read_sql_query(
                 """
-                SELECT h.price, h.price_per_square, h.scraped_at
+                SELECT h.price, h.price_per_square, h.scraped_at, r.room_num
                 FROM LISTING_PRICE_HISTORY h
                 JOIN REAL_ESTATE r ON r.id = h.listing_id
                 JOIN REGION g ON g.id = r.region_id
@@ -227,55 +229,31 @@ def build_district_trend_figure(db_path, district_name, y="price"):
         except sqlite3.Error:
             hist = pd.DataFrame()
 
-    fig = go.Figure()
+    n_rows = len(room_groups)
+    fig = make_subplots(
+        rows=n_rows,
+        cols=1,
+        shared_xaxes=False,
+        subplot_titles=[
+            f"rooms: {g}" if g != LARGE_ROOM_GROUP else "rooms: 5+"
+            for g in room_groups
+        ],
+        vertical_spacing=min(0.07, 0.55 / max(n_rows - 1, 1)),
+    )
+
     if hist.empty:
         fig.update_layout(
             title=f"{district_name}: no price history yet",
             width=1200,
-            height=480,
-            xaxis_title="time",
-            yaxis_title=y_label,
+            height=420 * n_rows,
         )
         return fig
 
     hist = hist.copy()
+    hist["room_group"] = hist["room_num"].map(_room_group)
     hist["scrape_day"] = pd.to_datetime(hist["scraped_at"], utc=True, errors="coerce")
-    hist = hist.dropna(subset=["scrape_day", y])
+    hist = hist.dropna(subset=["scrape_day", "room_group", y])
     hist["scrape_day"] = hist["scrape_day"].dt.tz_convert(None).dt.normalize()
-
-    if hist.empty:
-        fig.update_layout(
-            title=f"{district_name}: no price history yet",
-            width=1200,
-            height=480,
-        )
-        return fig
-
-    stats = (
-        hist.groupby("scrape_day", as_index=False)[y]
-        .agg(
-            min="min",
-            q1=lambda s: float(s.quantile(0.25)),
-            median="median",
-            q3=lambda s: float(s.quantile(0.75)),
-            max="max",
-        )
-        .sort_values("scrape_day")
-    )
-
-    # IQR band between Q1 and Q3
-    fig.add_trace(
-        go.Scatter(
-            x=list(stats["scrape_day"]) + list(stats["scrape_day"][::-1]),
-            y=list(stats["q3"]) + list(stats["q1"][::-1]),
-            fill="toself",
-            fillcolor="rgba(15, 110, 86, 0.12)",
-            line=dict(width=0),
-            name="IQR (Q1–Q3)",
-            hoverinfo="skip",
-            showlegend=True,
-        )
-    )
 
     series = [
         ("min", "#922b21", "dash"),
@@ -284,28 +262,100 @@ def build_district_trend_figure(db_path, district_name, y="price"):
         ("q3", "#1f4e79", "dot"),
         ("max", "#6c3483", "dash"),
     ]
-    for col, color, dash in series:
+
+    for row_idx, room_group in enumerate(room_groups):
+        row = row_idx + 1
+        sub = hist[hist["room_group"] == room_group]
+        show_legend = row_idx == 0
+
+        if sub.empty:
+            fig.update_xaxes(title_text="time", row=row, col=1)
+            fig.update_yaxes(title_text=y_label, row=row, col=1)
+            continue
+
+        stats = (
+            sub.groupby("scrape_day", as_index=False)[y]
+            .agg(
+                min="min",
+                q1=lambda s: float(s.quantile(0.25)),
+                median="median",
+                q3=lambda s: float(s.quantile(0.75)),
+                max="max",
+            )
+            .sort_values("scrape_day")
+        )
+        total = len(sub)
+
+        fig.layout.annotations[row_idx].text = (
+            f"rooms: {room_group} ({total} history points)"
+            if room_group != LARGE_ROOM_GROUP
+            else f"rooms: 5+ ({total} history points)"
+        )
+
         fig.add_trace(
             go.Scatter(
-                x=stats["scrape_day"],
-                y=stats[col],
-                mode="lines+markers",
-                name=col.upper() if col in ("q1", "q3") else col.capitalize(),
-                line=dict(color=color, width=2 if col == "median" else 1.5, dash=dash),
-                marker=dict(size=7),
+                x=list(stats["scrape_day"]) + list(stats["scrape_day"][::-1]),
+                y=list(stats["q3"]) + list(stats["q1"][::-1]),
+                fill="toself",
+                fillcolor="rgba(15, 110, 86, 0.12)",
+                line=dict(width=0),
+                name="IQR (Q1–Q3)",
+                hoverinfo="skip",
+                showlegend=show_legend,
+                legendgroup="iqr",
+            ),
+            row=row,
+            col=1,
+        )
+
+        for col, color, dash in series:
+            label = col.upper() if col in ("q1", "q3") else col.capitalize()
+            fig.add_trace(
+                go.Scatter(
+                    x=stats["scrape_day"],
+                    y=stats[col],
+                    mode="lines+markers",
+                    name=label,
+                    legendgroup=col,
+                    showlegend=show_legend,
+                    line=dict(
+                        color=color,
+                        width=2 if col == "median" else 1.5,
+                        dash=dash,
+                    ),
+                    marker=dict(size=7),
+                ),
+                row=row,
+                col=1,
             )
+
+        fig.update_xaxes(title_text="time", showgrid=True, row=row, col=1)
+        fig.update_yaxes(
+            title_text=y_label,
+            showgrid=True,
+            automargin=True,
+            matches=None,
+            row=row,
+            col=1,
         )
 
     fig.update_layout(
-        title=f"{district_name}: price distribution over time",
+        title=dict(
+            text=f"{district_name}: price trends by room count",
+            y=0.995,
+            yanchor="top",
+        ),
         width=1200,
-        height=520,
-        margin=dict(t=60, b=60, l=70, r=30),
-        xaxis_title="time",
-        yaxis_title=y_label,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+        height=420 * n_rows,
+        margin=dict(t=70, b=100, l=70, r=30),
+        # Keep legend under all subplots so it never covers the title
+        legend=dict(
+            orientation="h",
+            yanchor="top",
+            y=-0.02,
+            x=0,
+            xanchor="left",
+        ),
         hovermode="x unified",
     )
-    fig.update_xaxes(showgrid=True)
-    fig.update_yaxes(showgrid=True, automargin=True)
     return fig
