@@ -1,0 +1,97 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Verify you are human — Yerevan rent statistics{% endblock %}
+{% block lede %}Quick check before viewing the dashboards.{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2 class="section-title">Confirm you are not a bot</h2>
+  <p class="meta">Enter the characters from the image to continue.</p>
+
+  {% if error %}
+    <ul class="messages">
+      <li>{{ error }}</li>
+    </ul>
+  {% endif %}
+
+  {% if locked %}
+    <p class="meta">Access is temporarily locked from this network. Try again later.</p>
+  {% else %}
+    <form method="post" action="{% url 'bot_verify' %}" class="captcha-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next_url }}">
+
+      {# Honeypot for naive bots; leave empty #}
+      <label class="hp" aria-hidden="true">
+        Company website
+        <input type="text" name="company_url" value="" tabindex="-1" autocomplete="off">
+      </label>
+
+      <div class="captcha-row">
+        <img
+          src="{% url 'bot_captcha_image' %}?t={{ captcha_nonce }}"
+          alt="CAPTCHA characters"
+          width="200"
+          height="70"
+          class="captcha-img"
+        >
+        <a class="meta" href="{% url 'bot_verify' %}?next={{ next_url|urlencode }}">Refresh image</a>
+      </div>
+
+      <label>
+        Characters
+        <input
+          type="text"
+          name="captcha"
+          maxlength="8"
+          autocomplete="off"
+          autocapitalize="characters"
+          spellcheck="false"
+          required
+          autofocus
+        >
+      </label>
+
+      <button type="submit">Continue</button>
+    </form>
+  {% endif %}
+</section>
+
+<style>
+  .captcha-form {
+    display: grid;
+    gap: 1rem;
+    max-width: 28rem;
+  }
+  .captcha-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .captcha-img {
+    border: 1px solid #d9d2c4;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .captcha-form label {
+    display: grid;
+    gap: 0.35rem;
+  }
+  .captcha-form input[type="text"] {
+    font: inherit;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid #d9d2c4;
+    border-radius: 8px;
+    max-width: 12rem;
+  }
+  .hp {
+    position: absolute;
+    left: -10000px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+</style>
+{% endblock %}

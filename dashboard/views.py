@@ -1,10 +1,12 @@
+import secrets
 import sqlite3
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
-from django.shortcuts import render
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
 
 from charts import (
     build_district_trend_figure,
@@ -12,6 +14,15 @@ from charts import (
     list_districts_with_data,
     list_room_groups,
     parse_room_group,
+)
+from dashboard.bot_gate import (
+    captcha_code,
+    check_answer,
+    is_locked,
+    is_verified,
+    issue_captcha,
+    render_captcha_svg,
+    safe_next_url,
 )
 from scrape_meta import latest_scrape_finished_at
 
@@ -90,6 +101,46 @@ def _schedule_context():
         "scrape_minute": settings.SCRAPE_CRON_MINUTE,
         "timezone": settings.TIME_ZONE,
     }
+
+
+def bot_verify(request):
+    next_url = safe_next_url(
+        request, request.POST.get("next") or request.GET.get("next")
+    )
+    if is_verified(request):
+        return redirect(next_url)
+
+    error = ""
+    if request.method == "POST":
+        ok, error = check_answer(
+            request,
+            answer=request.POST.get("captcha", ""),
+            honeypot=request.POST.get("company_url", ""),
+        )
+        if ok:
+            return redirect(next_url)
+    elif captcha_code(request) is None:
+        issue_captcha(request)
+
+    return render(
+        request,
+        "dashboard/verify.html",
+        {
+            "nav": None,
+            "hide_nav": True,
+            "next_url": next_url,
+            "error": error,
+            "locked": is_locked(request),
+            "captcha_nonce": secrets.token_hex(4),
+        },
+    )
+
+
+def bot_captcha_image(request):
+    code = captcha_code(request) or issue_captcha(request)
+    response = HttpResponse(render_captcha_svg(code), content_type="image/svg+xml")
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
 
 
 def home(request):

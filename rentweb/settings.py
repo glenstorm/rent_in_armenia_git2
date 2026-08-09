@@ -2,6 +2,7 @@
 Django settings for rentweb project.
 """
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -30,7 +31,27 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "dashboard.middleware.BotGateMiddleware",
 ]
+
+# Public pages require a solved CAPTCHA session (set BOT_GATE_ENABLED=0 to disable)
+BOT_GATE_ENABLED = os.environ.get("BOT_GATE_ENABLED", "1").lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+BOT_GATE_TTL_SECONDS = 60 * 60 * 24
+BOT_GATE_MAX_ATTEMPTS = 8
+BOT_GATE_LOCKOUT_SECONDS = 300
+BOT_GATE_MIN_SOLVE_SECONDS = 1.5
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "rentweb-bot-gate",
+    }
+}
 
 ROOT_URLCONF = "rentweb.urls"
 

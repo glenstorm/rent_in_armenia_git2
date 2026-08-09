@@ -198,11 +198,13 @@
     <h1>Yerevan rent statistics</h1>
     <p class="lede">{% block lede %}Listings gathered from list.am.{% endblock %}</p>
 
+    {% if not hide_nav %}
     <ul class="nav">
       <li><a href="{% url 'home' %}" class="{% if nav == 'home' %}active{% endif %}">Overview</a></li>
       <li><a href="{% url 'trends' %}" class="{% if nav == 'trends' %}active{% endif %}">Price trends by district</a></li>
       <li><a href="{% url 'distribution' %}" class="{% if nav == 'distribution' %}active{% endif %}">Current distribution by rooms</a></li>
     </ul>
+    {% endif %}
 
     {% if messages %}
       <ul class="messages">
