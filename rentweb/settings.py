@@ -62,7 +62,8 @@ DATABASES = {
 RENT_DB_PATH = BASE_DIR / "real_estate.db"
 RENT_SCHEMA_PATH = BASE_DIR / "schema.sql"
 
-# Daily scrape at local midnight (Asia/Yerevan)
+# Weekly scrape at local midnight Monday (Asia/Yerevan)
+SCRAPE_CRON_DAY_OF_WEEK = "mon"  # mon..sun
 SCRAPE_CRON_HOUR = 0
 SCRAPE_CRON_MINUTE = 0
 ENABLE_SCRAPE_SCHEDULER = True

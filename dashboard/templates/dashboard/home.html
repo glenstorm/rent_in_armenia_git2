@@ -120,30 +120,6 @@
       color: var(--muted);
     }
     .meta { color: var(--muted); font-size: 0.9rem; }
-    .progress-panel h2 {
-      margin: 0 0 0.75rem;
-      font-size: 1.05rem;
-    }
-    .progress-status {
-      margin: 0 0 0.75rem;
-      font-weight: 600;
-    }
-    .progress-status.running { color: var(--accent); }
-    .progress-log {
-      margin: 0;
-      max-height: 320px;
-      overflow: auto;
-      padding: 0.85rem 1rem;
-      border-radius: 8px;
-      background: #1c2430;
-      color: #e8eef5;
-      font: 0.85rem/1.45 Consolas, "Courier New", monospace;
-      white-space: pre-wrap;
-    }
-    .progress-log:empty::before {
-      content: "No scrape activity yet.";
-      color: #9aa6b5;
-    }
   </style>
 </head>
 <body>
@@ -179,7 +155,7 @@
         </li>
       </ul>
       <p class="meta" style="margin: 1rem 0 0;">
-        Daily scrape scheduled at
+        Weekly scrape scheduled on {{ scrape_day }} at
         {{ scrape_hour|stringformat:"02d" }}:{{ scrape_minute|stringformat:"02d" }}
         ({{ timezone }}).
       </p>
@@ -198,22 +174,6 @@
         </label>
         <button type="submit">Update chart</button>
       </form>
-
-      <form method="post" action="{% url 'scrape_now' %}">
-        {% csrf_token %}
-        <button id="scrape-btn" type="submit" {% if scrape_running %}disabled{% endif %}>
-          {% if scrape_running %}Scraping…{% else %}Scrape now{% endif %}
-        </button>
-      </form>
-    </section>
-
-    <section class="panel progress-panel">
-      <h2>Scrape progress</h2>
-      <p id="progress-status" class="progress-status{% if scrape_running %} running{% endif %}">
-        {% if scrape_running %}Running…{% else %}Idle{% endif %}
-      </p>
-      <pre id="progress-log" class="progress-log">{% for line in progress_lines %}{{ line }}
-{% endfor %}</pre>
     </section>
 
     <section class="panel">
@@ -222,83 +182,11 @@
       {% else %}
         <div class="empty">
           <p>No listings in the database yet.</p>
-          <p>Run <code>python manage.py setup_db</code>, then scrape from here or with
-            <code>python manage.py scrape_listings</code>.</p>
+          <p>Run <code>python manage.py setup_db</code>, then
+            <code>python manage.py scrape_listings</code> (or wait for the daily scheduled scrape).</p>
         </div>
       {% endif %}
     </section>
   </main>
-  <script>
-    (function () {
-      const statusEl = document.getElementById("progress-status");
-      const logEl = document.getElementById("progress-log");
-      const btn = document.getElementById("scrape-btn");
-      const statusUrl = "{% url 'scrape_status' %}";
-      let wasRunning = {{ scrape_running|yesno:"true,false" }};
-      let timer = null;
-
-      function render(data) {
-        const running = !!data.running;
-        statusEl.textContent = running
-          ? "Running..."
-          : (data.error ? ("Failed: " + data.error) : (data.finished_at ? "Finished" : "Idle"));
-        statusEl.classList.toggle("running", running);
-        logEl.textContent = (data.lines || []).join("\n");
-        logEl.scrollTop = logEl.scrollHeight;
-        if (btn) {
-          btn.disabled = running;
-          btn.textContent = running ? "Scraping..." : "Scrape now";
-        }
-        if (wasRunning && !running) {
-          stopPolling();
-          window.location.reload();
-          return;
-        }
-        wasRunning = running;
-        if (!running) {
-          stopPolling();
-        }
-      }
-
-      function stopPolling() {
-        if (timer !== null) {
-          clearInterval(timer);
-          timer = null;
-        }
-      }
-
-      function startPolling() {
-        if (timer !== null) {
-          return;
-        }
-        timer = setInterval(poll, 1500);
-      }
-
-      async function poll() {
-        try {
-          const res = await fetch(statusUrl, { headers: { "Accept": "application/json" } });
-          if (res.ok) {
-            render(await res.json());
-          }
-        } catch (e) {
-          // ignore transient network errors
-        }
-      }
-
-      // Poll only while a scrape is active; idle pages stay quiet.
-      if (wasRunning) {
-        poll();
-        startPolling();
-      }
-
-      const scrapeForm = btn && btn.closest("form");
-      if (scrapeForm) {
-        scrapeForm.addEventListener("submit", function () {
-          wasRunning = true;
-          startPolling();
-        });
-      }
-    })();
-  </script>
 </body>
 </html>
