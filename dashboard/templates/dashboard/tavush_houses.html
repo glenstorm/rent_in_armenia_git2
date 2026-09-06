@@ -1,0 +1,204 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Tavush house prices — sale statistics{% endblock %}
+{% block lede %}House-for-sale prices across Tavush (Dilijan, Ijevan, Haghartsin, Hovk) from list.am.{% endblock %}
+
+{% block content %}
+<section class="panel row">
+  <form class="inline" method="get" action="{% url 'tavush_houses' %}">
+    <span>Town:</span>
+    <label>
+      <input type="radio" name="town" value="all" {% if selected_town == "all" %}checked{% endif %}>
+      all Tavush
+    </label>
+    {% for town in towns %}
+      <label>
+        <input type="radio" name="town" value="{{ town }}" {% if selected_town == town %}checked{% endif %}>
+        {{ town }}
+      </label>
+    {% endfor %}
+    <span>Y-axis:</span>
+    <label>
+      <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
+      price
+    </label>
+    <label>
+      <input type="radio" name="y" value="price_per_square" {% if y == "price_per_square" %}checked{% endif %}>
+      price per m²
+    </label>
+    <button type="submit">Update charts</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Tavush houses for sale</h2>
+  {% if house_stats.by_town %}
+    <ul class="district-stats">
+      {% for row in house_stats.by_town %}
+        <li>
+          <strong>{{ row.count }}</strong>
+          <span>{{ row.name }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <p class="meta">
+    {{ house_stats.count }} listings. Prices stored in AMD (USD ads converted at scrape-time rate).
+  </p>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Compare prices by town</h2>
+  {% if town_box_html %}
+    {{ town_box_html|safe }}
+  {% else %}
+    <div class="empty">
+      <p>No Tavush house listings yet.</p>
+      <p>Run <code>python manage.py scrape_houses</code>.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Compare prices by room count</h2>
+  {% if room_box_html %}
+    {{ room_box_html|safe }}
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Best buys under {{ budget_max_display }} AMD</h2>
+  <p class="meta" style="margin-top:0;">
+    Ranked by lowest price per m² (only listings with known living area).
+  </p>
+  {% if best_buys %}
+    <div class="listing-table-wrap">
+      <table class="listing-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Town</th>
+            <th>AMD/m²</th>
+            <th>Price (AMD)</th>
+            <th>m²</th>
+            <th>Rooms</th>
+            <th>Listing</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in best_buys %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ item.town }}</td>
+              <td>{{ item.ppm2_display }}</td>
+              <td>{{ item.price_display }}</td>
+              <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
+              <td>{{ item.rooms }}</td>
+              <td>
+                <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
+                  {{ item.address }}
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="meta">No ranked buys yet (need scrapes with square meters under the budget).</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Price trends by rooms</h2>
+  <p class="meta" style="margin-top:0;">
+    Under each room-group trend: houses priced under {{ budget_max_display }} AMD
+    {% if selected_town == "all" %}across Tavush{% else %}in {{ selected_town }}{% endif %}.
+  </p>
+
+  {% if trend_sections %}
+    {% for section in trend_sections %}
+      <div class="trend-room-block">
+        <h3 class="section-title">Rooms: {{ section.rooms_label }}</h3>
+        {{ section.trend_html|safe }}
+
+        <h4 class="budget-title">
+          Under {{ budget_max_display }} AMD
+          ({{ section.listings|length }})
+        </h4>
+        {% if section.listings %}
+          <div class="listing-table-wrap">
+            <table class="listing-table">
+              <thead>
+                <tr>
+                  <th>Town</th>
+                  <th>Price (AMD)</th>
+                  <th>AMD/m²</th>
+                  <th>Rooms</th>
+                  <th>m²</th>
+                  <th>Listing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in section.listings %}
+                  <tr>
+                    <td>{{ item.town }}</td>
+                    <td>{{ item.price_display }}</td>
+                    <td>{{ item.ppm2_display }}</td>
+                    <td>{{ item.rooms }}</td>
+                    <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
+                    <td>
+                      <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
+                        {{ item.address }}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="meta">No houses under {{ budget_max_display }} AMD in this room group.</p>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">Trends appear after the first house scrape.</p>
+  {% endif %}
+</section>
+
+<style>
+  .trend-room-block {
+    margin: 1.25rem 0 2rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e2d9c8;
+  }
+  .trend-room-block:first-of-type { border-top: 0; padding-top: 0; }
+  .budget-title {
+    margin: 0.75rem 0 0.5rem;
+    font-size: 1rem;
+  }
+  .listing-table-wrap { overflow-x: auto; }
+  .listing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  .listing-table th,
+  .listing-table td {
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid #e2d9c8;
+    vertical-align: top;
+  }
+  .listing-table th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .listing-table a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .listing-table a:hover { text-decoration: underline; }
+</style>
+{% endblock %}

@@ -46,3 +46,31 @@ CREATE TABLE LISTING_PRICE_HISTORY (
 );
 CREATE INDEX IF NOT EXISTS idx_listing_price_history_listing_time
 	ON LISTING_PRICE_HISTORY(listing_id, scraped_at);
+
+-- Houses for sale (e.g. Dilijan category 1386). Square is often missing on list cards.
+DROP TABLE IF EXISTS HOUSE_PRICE_HISTORY;
+DROP TABLE IF EXISTS HOUSES;
+CREATE TABLE HOUSES (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	square INTEGER,
+	is_agent INTEGER,
+	region_id INTEGER,
+	price INTEGER NOT NULL,
+	price_per_square REAL,
+	room_num INTEGER NOT NULL,
+	address TEXT NOT NULL,
+	link TEXT NOT NULL UNIQUE,
+	ddate DATE NOT NULL DEFAULT CURRENT_DATE,
+	FOREIGN KEY(region_id) REFERENCES REGION(id)
+);
+
+CREATE TABLE HOUSE_PRICE_HISTORY (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	listing_id INTEGER NOT NULL,
+	price INTEGER NOT NULL,
+	price_per_square REAL,
+	scraped_at TEXT NOT NULL,
+	FOREIGN KEY(listing_id) REFERENCES HOUSES(id)
+);
+CREATE INDEX IF NOT EXISTS idx_house_price_history_listing_time
+	ON HOUSE_PRICE_HISTORY(listing_id, scraped_at);

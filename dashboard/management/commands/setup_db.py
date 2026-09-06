@@ -7,6 +7,8 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from init_db import init_db
+from city import all_house_region_map
+from house_store import ensure_house_locations, ensure_houses_schema
 from listing_history import backfill_price_history, ensure_price_history_table
 from scrape_meta import ensure_scrape_runs_table
 
@@ -39,17 +41,20 @@ class Command(BaseCommand):
                 ensure_scrape_runs_table(connection)
                 ensure_price_history_table(connection)
                 backfill_price_history(connection)
-            if row and row[0] > 0:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Rent DB already initialized at {db_path} "
-                        "(use --force to recreate)."
+                if row and row[0] > 0:
+                    ensure_houses_schema(connection)
+                    ensure_house_locations(connection, all_house_region_map())
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Rent DB already initialized at {db_path} "
+                            "(use --force to recreate)."
+                        )
                     )
-                )
-                self.stdout.write(
-                    "Ensured SCRAPE_RUNS and LISTING_PRICE_HISTORY tables exist."
-                )
-                return
+                    self.stdout.write(
+                        "Ensured SCRAPE_RUNS, LISTING_PRICE_HISTORY, HOUSES tables "
+                        "and Tavush house regions exist."
+                    )
+                    return
 
         init_db(db_path=str(db_path), schema_path=str(schema_path))
         with sqlite3.connect(db_path) as connection:

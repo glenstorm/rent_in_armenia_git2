@@ -15,6 +15,18 @@ from charts import (
     list_room_groups,
     parse_room_group,
 )
+from house_charts import (
+    HOUSE_BUDGET_MAX_AMD,
+    HOUSE_LARGE_ROOM_GROUP,
+    HOUSE_TREND_ROOM_GROUPS,
+    build_house_room_box_figure,
+    build_house_town_box_figure,
+    build_house_trend_figure,
+    house_listing_stats,
+    list_budget_houses_by_rooms,
+    rank_best_buys,
+    tavush_location_names,
+)
 from dashboard.bot_gate import (
     captcha_code,
     check_answer,
@@ -214,3 +226,90 @@ def distribution(request):
             **_schedule_context(),
         },
     )
+
+
+def tavush_houses(request):
+    y = _parse_y(request)
+    db_path = str(settings.RENT_DB_PATH)
+    towns = tavush_location_names()
+    selected_town = request.GET.get("town") or "all"
+    if selected_town != "all" and selected_town not in towns:
+        selected_town = "all"
+    location_names = towns if selected_town == "all" else [selected_town]
+
+    house_stats = house_listing_stats(db_path, location_names)
+    budget_max = HOUSE_BUDGET_MAX_AMD
+    town_box_html = ""
+    room_box_html = ""
+    trend_sections = []
+    best_buys = []
+
+    if house_stats["count"]:
+        town_fig = build_house_town_box_figure(
+            db_path, y=y, location_names=location_names
+        )
+        room_fig = build_house_room_box_figure(
+            db_path, y=y, location_names=location_names
+        )
+        town_box_html = town_fig.to_html(full_html=False, include_plotlyjs="cdn")
+        room_box_html = room_fig.to_html(full_html=False, include_plotlyjs=False)
+
+        best_buys = rank_best_buys(
+            db_path,
+            location_names=location_names,
+            max_price_amd=budget_max,
+            limit=25,
+        )
+
+        budget_by_rooms = {
+            section["room_group"]: section
+            for section in list_budget_houses_by_rooms(
+                db_path,
+                location_names=location_names,
+                max_price_amd=budget_max,
+            )
+        }
+        for room_group in HOUSE_TREND_ROOM_GROUPS:
+            trend_fig = build_house_trend_figure(
+                db_path,
+                y=y,
+                location_names=location_names,
+                room_group=room_group,
+            )
+            trend_html = trend_fig.to_html(full_html=False, include_plotlyjs=False)
+            budget = budget_by_rooms.get(room_group, {})
+            trend_sections.append(
+                {
+                    "rooms_label": (
+                        "8+"
+                        if room_group == HOUSE_LARGE_ROOM_GROUP
+                        else str(room_group)
+                    ),
+                    "trend_html": trend_html,
+                    "listings": budget.get("listings", []),
+                }
+            )
+
+    return render(
+        request,
+        "dashboard/tavush_houses.html",
+        {
+            "nav": "tavush_houses",
+            "y": y,
+            "towns": towns,
+            "selected_town": selected_town,
+            "house_stats": house_stats,
+            "town_box_html": town_box_html,
+            "room_box_html": room_box_html,
+            "best_buys": best_buys,
+            "trend_sections": trend_sections,
+            "budget_max": budget_max,
+            "budget_max_display": f"{budget_max:,}".replace(",", " "),
+            **_schedule_context(),
+        },
+    )
+
+
+def dilijan_houses(request):
+    """Old URL — redirect to Tavush houses page."""
+    return redirect("tavush_houses")

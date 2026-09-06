@@ -38,3 +38,36 @@ def scrape_district_ids():
 
 # Backward-compatible name list in mapping order (includes Yerevan).
 districts = list(DISTRICTS.values())
+
+
+# list.am location `n` for Tavush house-sale scrapes (category 1386)
+HOUSE_LOCATIONS = {
+    58: "Dilijan",
+    60: "Ijevan",
+}
+
+# Villages without a stable list.am `n` filter — scrape via ?q= and match place name.
+# REGION ids are synthetic (do not collide with list.am n values above).
+HOUSE_SEARCH_LOCATIONS = {
+    1001: {
+        "name": "Haghartsin",
+        "query": "Агарцин",
+        "place_aliases": ("Агарцин", "Haghartsin", "Հաղարծին"),
+    },
+    1002: {
+        "name": "Hovk",
+        "query": "Hovk",
+        "place_aliases": ("Овк", "Hovk", "Հովք"),
+    },
+}
+
+# Houses for sale on list.am
+HOUSE_SALE_CATEGORY_ID = 1386
+
+
+def all_house_region_map():
+    """region_id → display name for every house market we store."""
+    regions = dict(HOUSE_LOCATIONS)
+    for location_id, meta in HOUSE_SEARCH_LOCATIONS.items():
+        regions[location_id] = meta["name"]
+    return regions

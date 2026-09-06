@@ -1,7 +1,92 @@
 from lxml import html
+import re
 
 from apartment import Apartment, area_is_plausible
 from district import District
+
+
+def _card_links(tree):
+    """Listing cards under category grids (old direct <a> or redesigned wrappers)."""
+    return tree.xpath(
+        '//*[@id="contentr"]//div[contains(@class,"gl")]'
+        '//a[contains(@href,"/item/")]'
+    )
+
+
+def _child_text(node):
+    return (node.text_content() or "").strip()
+
+
+def _normalize_item_link(href):
+    if not href:
+        return None
+    path = href.split("?", 1)[0]
+    if path.startswith("http"):
+        return path
+    return "https://www.list.am" + path
+
+
+def _parse_price_amd(price_text, currencies):
+    """Parse list.am price text into AMD integer."""
+    if not price_text:
+        return None
+    text = (
+        price_text.replace("\u00a0", " ")
+        .replace(",", "")
+        .strip()
+    )
+    text = re.sub(r"в\s*месяц.*$", "", text, flags=re.IGNORECASE).strip()
+    if not text:
+        return None
+
+    try:
+        if "$" in text:
+            num = re.search(r"([\d.]+)", text.replace("$", " "))
+            if not num:
+                return None
+            return int(float(num.group(1)) * currencies[1])
+        if "€" in text or "EUR" in text.upper():
+            num = re.search(r"([\d.]+)", text)
+            if not num:
+                return None
+            return int(float(num.group(1)) * currencies[2])
+        # AMD (plain digits or ֏ suffix)
+        num = re.search(r"([\d.]+)", text.replace("֏", " "))
+        if not num:
+            return None
+        return int(float(num.group(1)))
+    except (ValueError, TypeError, IndexError):
+        return None
+
+
+def _parse_rooms_and_square(detail_text):
+    """
+    Extract rooms + living m² from subtitle lines such as:
+      "Кентрон, 2 ком., 55 кв.м."
+      "2 ком., 55 кв.м., 3/8 этаж"
+    """
+    if not detail_text:
+        return None, None
+    rooms_match = re.search(r"(\d+)\s*ком\.", detail_text)
+    square_match = re.search(
+        r"(\d[\d\s\u00a0,]*)\s*кв\.?\s*м\.?",
+        detail_text,
+        flags=re.IGNORECASE,
+    )
+    if not rooms_match or not square_match:
+        return None, None
+    try:
+        rooms = int(float(rooms_match.group(1)))
+        raw = (
+            square_match.group(1)
+            .replace("\u00a0", "")
+            .replace(" ", "")
+            .replace(",", "")
+        )
+        square = int(float(raw))
+    except (ValueError, TypeError):
+        return None, None
+    return rooms, square
 
 
 class PageParser:
@@ -13,79 +98,59 @@ class PageParser:
     def transform(page_content, region_id, currencies):
         dc = District(region_id)
         tree = html.fromstring(page_content)
-        aparts = tree.xpath(
-            '//*[@id="contentr"]/div[@class="dl"]/div[@class="gl"]/a[*]'
-        )
+        aparts = _card_links(tree)
 
         for apart in aparts:
             price = None
             where = None
-            link = apart.get("href")
+            title = None
+            link = _normalize_item_link(apart.get("href"))
             if not link:
                 continue
 
             for divs in apart:
-                if divs.attrib == {"class": "p"}:
-                    price = divs.text
-                if divs.attrib == {"class": "at"}:
-                    where = divs.text
+                classes = (divs.get("class") or "").strip()
+                if classes == "p" or classes.startswith("p "):
+                    price = _child_text(divs)
+                elif classes == "l" or classes.startswith("l "):
+                    title = _child_text(divs) or None
+                elif (classes == "at" or classes.startswith("at ")) and "location" not in classes:
+                    where = _child_text(divs)
 
-            if price is not None and where is not None:
-                # price part
-                intprice = 0
-                price = price.replace(",", "")
-                index = price.find(" ")
-                if index != -1:
-                    price = price[:index]
+            location_nodes = apart.xpath(
+                './/*[contains(concat(" ", normalize-space(@class), " "), " location ")]'
+                ' | .//*[contains(@class, "category-data-list-card__location")]'
+            )
+            location = _child_text(location_nodes[0]) if location_nodes else None
 
-                if not price:
-                    continue
+            if price is None or where is None:
+                continue
 
-                try:
-                    if price[0] == "$":
-                        price = price[1:]
-                        intprice = int(float(price) * currencies[1])
-                    elif price[0] == "€":
-                        price = price[1:]
-                        intprice = int(float(price) * currencies[2])
-                    else:
-                        intprice = int(float(price))
-                except (ValueError, TypeError, IndexError):
-                    continue
+            intprice = _parse_price_amd(price, currencies)
+            if intprice is None:
+                continue
 
-                # square part
-                index_where = where.find(" кв.м.")
-                leftborderwhere = -1
-                if index_where != -1:
-                    leftborderwhere = where.rfind(", ", 0, index_where)
+            room_num, square = _parse_rooms_and_square(where)
+            if room_num is None or square is None:
+                continue
+            if square <= 0 or room_num <= 0:
+                continue
+            if not area_is_plausible(room_num, square):
+                continue
 
-                index_rooms = where.find(" ком.")
-                leftborderrooms = -1
-                if index_rooms != -1:
-                    leftborderrooms = where.rfind(", ", 0, index_rooms)
+            if location and where:
+                address = f"{location}, {where}"
+            else:
+                address = title or where
 
-                if leftborderwhere != -1 and leftborderrooms != -1:
-                    newwhere = where[leftborderwhere + 2 : index_where]
-                    newrooms = where[leftborderrooms + 2 : index_rooms]
-                    try:
-                        square = int(float(newwhere))
-                        room_num = int(float(newrooms))
-                    except (ValueError, TypeError):
-                        continue
-
-                    if square <= 0 or room_num <= 0:
-                        continue
-                    if not area_is_plausible(room_num, square):
-                        continue
-
-                    dc.add(
-                        Apartment(
-                            where,
-                            room_num,
-                            intprice,
-                            square,
-                            "https://www.list.am" + link,
-                        )
-                    )
+            dc.add(
+                Apartment(
+                    address,
+                    room_num,
+                    intprice,
+                    square,
+                    link,
+                )
+            )
 
         return dc

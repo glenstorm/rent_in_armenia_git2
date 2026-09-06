@@ -37,6 +37,19 @@ class CurrencyRates:
                     TypeError,
                     ValueError,
                 ) as e:
+                    # Prefer yesterday's / latest cached rate over failing the scrape.
+                    cur.execute(
+                        """
+                        SELECT cur_date, usd_rate, eur_rate
+                        FROM CURRENCIES
+                        ORDER BY cur_date DESC
+                        LIMIT 1
+                        """
+                    )
+                    cached = cur.fetchone()
+                    if cached:
+                        self.cur_currency = (cached[0], cached[1], cached[2])
+                        return self.cur_currency
                     raise RuntimeError(f"Failed to fetch currency rates: {e}") from e
 
                 cur.execute(

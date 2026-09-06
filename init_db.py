@@ -1,6 +1,6 @@
 import sqlite3
 
-from city import DISTRICTS
+from city import DISTRICTS, all_house_region_map
 
 
 def init_db(db_path="real_estate.db", schema_path="schema.sql"):
@@ -14,6 +14,11 @@ def init_db(db_path="real_estate.db", schema_path="schema.sql"):
             cur.execute(
                 "INSERT INTO REGION (id, region_name) VALUES (?, ?)",
                 (district_id, region_name),
+            )
+        for location_id, region_name in all_house_region_map().items():
+            cur.execute(
+                "INSERT INTO REGION (id, region_name) VALUES (?, ?)",
+                (location_id, region_name),
             )
         connection.commit()
     finally:

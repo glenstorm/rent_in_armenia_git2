@@ -25,11 +25,14 @@ def _progress(msg):
 
 
 def _execute_scrape():
+    from house_scraper import run_house_scrape
     from scraper import run_scrape
 
     print("Starting list.am scrape...", flush=True)
     try:
         run_scrape(db_path=str(settings.RENT_DB_PATH), progress=_progress)
+        print("Rent scrape finished; starting Tavush houses...", flush=True)
+        run_house_scrape(db_path=str(settings.RENT_DB_PATH), progress=_progress)
         print("Scrape finished.", flush=True)
     except Exception:
         logger.exception("Scrape failed")
