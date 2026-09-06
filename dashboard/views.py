@@ -21,7 +21,7 @@ from dilijan_rent_charts import (
     build_dilijan_rent_room_box_figure,
     build_dilijan_rent_type_box_figure,
     dilijan_rent_stats,
-    list_dilijan_rent_budget,
+    list_dilijan_rent_budget_by_rooms,
 )
 from dilijan_rent_store import dedupe_dilijan_rent_links, ensure_dilijan_rent_schema
 from house_charts import (
@@ -346,25 +346,52 @@ def dilijan_rent(request):
 
     rent_stats = dilijan_rent_stats(db_path, property_types)
     budget_max = 400_000
+    highlight_max = 200_000
     type_box_html = ""
-    room_box_html = ""
-    budget_listings = []
+    apartment_room_box_html = ""
+    house_room_box_html = ""
+    apartment_room_sections = []
+    house_room_sections = []
 
     if rent_stats["count"]:
         type_fig = build_dilijan_rent_type_box_figure(
             db_path, y=y, property_types=property_types
         )
-        room_fig = build_dilijan_rent_room_box_figure(
-            db_path, y=y, property_types=property_types
-        )
         type_box_html = type_fig.to_html(full_html=False, include_plotlyjs="cdn")
-        room_box_html = room_fig.to_html(full_html=False, include_plotlyjs=False)
-        budget_listings = list_dilijan_rent_budget(
-            db_path,
-            property_types=property_types,
-            max_price_amd=budget_max,
-            limit=40,
-        )
+        include_js = False
+
+        show_apartments = selected_type in ("all", PROPERTY_APARTMENT)
+        show_houses = selected_type in ("all", PROPERTY_HOUSE)
+        if show_apartments:
+            apt_room_fig = build_dilijan_rent_room_box_figure(
+                db_path,
+                y=y,
+                property_types=[PROPERTY_APARTMENT],
+                title_prefix="Dilijan apartments",
+            )
+            apartment_room_box_html = apt_room_fig.to_html(
+                full_html=False, include_plotlyjs=include_js
+            )
+            apartment_room_sections = list_dilijan_rent_budget_by_rooms(
+                db_path,
+                property_types=[PROPERTY_APARTMENT],
+                max_price_amd=budget_max,
+            )
+        if show_houses:
+            house_room_fig = build_dilijan_rent_room_box_figure(
+                db_path,
+                y=y,
+                property_types=[PROPERTY_HOUSE],
+                title_prefix="Dilijan houses",
+            )
+            house_room_box_html = house_room_fig.to_html(
+                full_html=False, include_plotlyjs=include_js
+            )
+            house_room_sections = list_dilijan_rent_budget_by_rooms(
+                db_path,
+                property_types=[PROPERTY_HOUSE],
+                max_price_amd=budget_max,
+            )
 
     return render(
         request,
@@ -375,10 +402,14 @@ def dilijan_rent(request):
             "selected_type": selected_type,
             "rent_stats": rent_stats,
             "type_box_html": type_box_html,
-            "room_box_html": room_box_html,
-            "budget_listings": budget_listings,
+            "apartment_room_box_html": apartment_room_box_html,
+            "house_room_box_html": house_room_box_html,
+            "apartment_room_sections": apartment_room_sections,
+            "house_room_sections": house_room_sections,
             "budget_max": budget_max,
             "budget_max_display": f"{budget_max:,}".replace(",", " "),
+            "highlight_max": highlight_max,
+            "highlight_max_display": f"{highlight_max:,}".replace(",", " "),
             **_schedule_context(),
         },
     )

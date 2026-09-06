@@ -37,7 +37,13 @@ def load_dilijan_rent(db_path, property_types=None):
 def dilijan_rent_stats(db_path, property_types=None):
     df = load_dilijan_rent(db_path, property_types)
     if df.empty:
-        return {"count": 0, "by_type": [], "by_rooms": []}
+        return {
+            "count": 0,
+            "by_type": [],
+            "by_rooms": [],
+            "by_rooms_apartments": [],
+            "by_rooms_houses": [],
+        }
 
     by_type = (
         df.groupby("property_type", dropna=False)
@@ -50,12 +56,21 @@ def dilijan_rent_stats(db_path, property_types=None):
         key=lambda s: s.map(lambda n: type_order.get(n, 99)),
     )
 
-    by_rooms = (
-        df.groupby("room_num", dropna=False)
-        .size()
-        .reset_index(name="count")
-        .sort_values("room_num")
-    )
+    def _rooms_breakdown(frame):
+        if frame.empty:
+            return []
+        by_rooms = (
+            frame.groupby("room_num", dropna=False)
+            .size()
+            .reset_index(name="count")
+            .sort_values("room_num")
+        )
+        return [
+            {"rooms": str(int(row.room_num)), "count": int(row.count)}
+            for row in by_rooms.itertuples(index=False)
+        ]
+
+    by_rooms = _rooms_breakdown(df)
     return {
         "count": int(len(df)),
         "by_type": [
@@ -66,10 +81,13 @@ def dilijan_rent_stats(db_path, property_types=None):
             }
             for row in by_type.itertuples(index=False)
         ],
-        "by_rooms": [
-            {"rooms": str(int(row.room_num)), "count": int(row.count)}
-            for row in by_rooms.itertuples(index=False)
-        ],
+        "by_rooms": by_rooms,
+        "by_rooms_apartments": _rooms_breakdown(
+            df[df["property_type"] == PROPERTY_APARTMENT]
+        ),
+        "by_rooms_houses": _rooms_breakdown(
+            df[df["property_type"] == PROPERTY_HOUSE]
+        ),
     }
 
 
@@ -120,14 +138,17 @@ def build_dilijan_rent_type_box_figure(db_path, y="price", property_types=None):
     return fig
 
 
-def build_dilijan_rent_room_box_figure(db_path, y="price", property_types=None):
+def build_dilijan_rent_room_box_figure(
+    db_path, y="price", property_types=None, title_prefix=None
+):
     if y not in ("price", "price_per_square"):
         y = "price"
     df = load_dilijan_rent(db_path, property_types)
+    label = title_prefix or "Dilijan rent"
     if df.empty:
         fig = go.Figure()
         fig.update_layout(
-            title="Dilijan rent by rooms — no data",
+            title=f"{label} by rooms — no data",
             width=1200,
             height=420,
         )
@@ -137,7 +158,7 @@ def build_dilijan_rent_room_box_figure(db_path, y="price", property_types=None):
     if plot_df.empty:
         fig = go.Figure()
         fig.update_layout(
-            title=f"Dilijan rent by rooms — no data for {y}",
+            title=f"{label} by rooms — no data for {y}",
             width=1200,
             height=420,
         )
@@ -158,7 +179,10 @@ def build_dilijan_rent_room_box_figure(db_path, y="price", property_types=None):
         )
     ylabel = "AMD / month" if y == "price" else "AMD / m² / month"
     fig.update_layout(
-        title=f"Dilijan long-term rent — {y.replace('_', ' ')} by rooms ({len(plot_df)} listings)",
+        title=(
+            f"{label} — {y.replace('_', ' ')} by rooms "
+            f"({len(plot_df)} listings)"
+        ),
         xaxis_title="rooms",
         yaxis_title=ylabel,
         width=1200,
@@ -220,3 +244,67 @@ def list_dilijan_rent_budget(
             }
         )
     return rows
+
+
+def _listing_dict_from_row(row):
+    square = (
+        int(row.square)
+        if getattr(row, "square", None) is not None and not pd.isna(row.square)
+        else None
+    )
+    ppm2 = (
+        float(row.price_per_square)
+        if getattr(row, "price_per_square", None) is not None
+        and not pd.isna(row.price_per_square)
+        else None
+    )
+    return {
+        "property_type": row.property_type,
+        "type_label": PROPERTY_LABELS.get(row.property_type, row.property_type),
+        "price": int(row.price),
+        "price_display": f"{int(row.price):,}".replace(",", " "),
+        "rooms": int(row.room_num),
+        "square": square,
+        "ppm2_display": (
+            f"{int(round(ppm2)):,}".replace(",", " ") if ppm2 is not None else "—"
+        ),
+        "address": row.address,
+        "link": row.link,
+    }
+
+
+def list_dilijan_rent_budget_by_rooms(
+    db_path,
+    property_types=None,
+    max_price_amd=400_000,
+    limit_per_group=None,
+):
+    """
+    Budget listings grouped by room count (ascending),
+    each group ordered by price ascending.
+    """
+    df = load_dilijan_rent(db_path, property_types)
+    if df.empty:
+        return []
+
+    df = df[df["price"] < int(max_price_amd)].copy()
+    if df.empty:
+        return []
+
+    df = df.sort_values(["room_num", "price"], ascending=[True, True])
+    sections = []
+    for rooms, group in df.groupby("room_num", sort=True):
+        if limit_per_group:
+            group = group.head(int(limit_per_group))
+        rooms_int = int(rooms)
+        listings = [
+            _listing_dict_from_row(row) for row in group.itertuples(index=False)
+        ]
+        sections.append(
+            {
+                "rooms": rooms_int,
+                "rooms_label": str(rooms_int),
+                "listings": listings,
+            }
+        )
+    return sections

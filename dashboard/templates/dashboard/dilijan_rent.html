@@ -48,6 +48,34 @@
     {{ rent_stats.count }} listings. Prices stored in AMD per month
     (USD ads converted at scrape-time rate).
   </p>
+
+  {% if selected_type == "all" or selected_type == "apartment" %}
+    {% if rent_stats.by_rooms_apartments %}
+      <h3 class="budget-title">Apartments by rooms</h3>
+      <ul class="district-stats">
+        {% for row in rent_stats.by_rooms_apartments %}
+          <li>
+            <strong>{{ row.count }}</strong>
+            <span>{{ row.rooms }} room{% if row.rooms != "1" %}s{% endif %}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
+
+  {% if selected_type == "all" or selected_type == "house" %}
+    {% if rent_stats.by_rooms_houses %}
+      <h3 class="budget-title">Houses by rooms</h3>
+      <ul class="district-stats">
+        {% for row in rent_stats.by_rooms_houses %}
+          <li>
+            <strong>{{ row.count }}</strong>
+            <span>{{ row.rooms }} room{% if row.rooms != "1" %}s{% endif %}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
 </section>
 
 <section class="panel">
@@ -65,50 +93,158 @@
 
 <section class="panel">
   <h2 class="section-title">Compare by room count</h2>
-  {% if room_box_html %}
-    {{ room_box_html|safe }}
+  {% if selected_type == "all" or selected_type == "apartment" %}
+    {% if apartment_room_box_html %}
+      <div class="trend-room-block">
+        <h3 class="section-title">Apartments</h3>
+        {{ apartment_room_box_html|safe }}
+      </div>
+    {% endif %}
+  {% endif %}
+  {% if selected_type == "all" or selected_type == "house" %}
+    {% if house_room_box_html %}
+      <div class="trend-room-block">
+        <h3 class="section-title">Houses</h3>
+        {{ house_room_box_html|safe }}
+      </div>
+    {% endif %}
   {% endif %}
 </section>
 
 <section class="panel">
   <h2 class="section-title">Listings under {{ budget_max_display }} AMD / month</h2>
-  {% if budget_listings %}
-    <div class="listing-table-wrap">
-      <table class="listing-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Type</th>
-            <th>Price</th>
-            <th>Rooms</th>
-            <th>m²</th>
-            <th>AMD/m²</th>
-            <th>Address</th>
-            <th>Link</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in budget_listings %}
-            <tr>
-              <td>{{ forloop.counter }}</td>
-              <td>{{ item.type_label }}</td>
-              <td>{{ item.price_display }}</td>
-              <td>{{ item.rooms }}</td>
-              <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
-              <td>{{ item.ppm2_display }}</td>
-              <td>{{ item.address }}</td>
-              <td>
-                <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
-                  open
-                </a>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <p class="meta" style="margin-top:0;">
+    Split by property type. Listing title links to list.am.
+    Rows at ≤ {{ highlight_max_display }} AMD / month are highlighted.
+  </p>
+
+  {% if selected_type == "all" or selected_type == "apartment" %}
+    <div class="trend-room-block">
+      <h4 class="budget-title">Apartments</h4>
+      {% if apartment_room_sections %}
+        {% for section in apartment_room_sections %}
+          <h4 class="budget-title">
+            {{ section.rooms_label }} room{% if section.rooms != 1 %}s{% endif %}
+            ({{ section.listings|length }})
+          </h4>
+          <div class="listing-table-wrap">
+            <table class="listing-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Price (AMD)</th>
+                  <th>AMD/m²</th>
+                  <th>m²</th>
+                  <th>Listing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in section.listings %}
+                  <tr{% if item.price <= highlight_max %} class="rent-highlight"{% endif %}>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ item.price_display }}</td>
+                    <td>{{ item.ppm2_display }}</td>
+                    <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
+                    <td>
+                      <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
+                        {{ item.address }}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="meta">No apartment listings under {{ budget_max_display }} AMD / month.</p>
+      {% endif %}
     </div>
-  {% else %}
-    <p class="meta">No listings under this budget.</p>
+  {% endif %}
+
+  {% if selected_type == "all" or selected_type == "house" %}
+    <div class="trend-room-block">
+      <h4 class="budget-title">Houses</h4>
+      {% if house_room_sections %}
+        {% for section in house_room_sections %}
+          <h4 class="budget-title">
+            {{ section.rooms_label }} room{% if section.rooms != 1 %}s{% endif %}
+            ({{ section.listings|length }})
+          </h4>
+          <div class="listing-table-wrap">
+            <table class="listing-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Price (AMD)</th>
+                  <th>AMD/m²</th>
+                  <th>m²</th>
+                  <th>Listing</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in section.listings %}
+                  <tr{% if item.price <= highlight_max %} class="rent-highlight"{% endif %}>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ item.price_display }}</td>
+                    <td>{{ item.ppm2_display }}</td>
+                    <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
+                    <td>
+                      <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
+                        {{ item.address }}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="meta">No house listings under {{ budget_max_display }} AMD / month.</p>
+      {% endif %}
+    </div>
   {% endif %}
 </section>
+
+<style>
+  .trend-room-block {
+    margin: 1.25rem 0 2rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #e2d9c8;
+  }
+  .trend-room-block:first-of-type { border-top: 0; padding-top: 0; }
+  .budget-title {
+    margin: 0.75rem 0 0.5rem;
+    font-size: 1rem;
+  }
+  .listing-table-wrap { overflow-x: auto; }
+  .listing-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+  }
+  .listing-table th,
+  .listing-table td {
+    text-align: left;
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid #e2d9c8;
+    vertical-align: top;
+  }
+  .listing-table th {
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .listing-table a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .listing-table a:hover { text-decoration: underline; }
+  .listing-table tr.rent-highlight td {
+    background: rgba(15, 110, 86, 0.12);
+  }
+  .listing-table tr.rent-highlight td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+</style>
 {% endblock %}
