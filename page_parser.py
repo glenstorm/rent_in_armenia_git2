@@ -87,10 +87,11 @@ class PageParser:
     """
 
     @staticmethod
-    def transform(page_content, region_id, currencies):
-        dc = District(region_id)
+    def parse_apartments(page_content, currencies):
+        """Return a list of Apartment objects from a category HTML page."""
         tree = html.fromstring(page_content)
         aparts = _card_links(tree)
+        results = []
 
         for apart in aparts:
             price = None
@@ -135,7 +136,7 @@ class PageParser:
             else:
                 address = title or where
 
-            dc.add(
+            results.append(
                 Apartment(
                     address,
                     room_num,
@@ -145,4 +146,11 @@ class PageParser:
                 )
             )
 
+        return results
+
+    @staticmethod
+    def transform(page_content, region_id, currencies):
+        dc = District(region_id)
+        for apartment in PageParser.parse_apartments(page_content, currencies):
+            dc.add(apartment)
         return dc

@@ -8,6 +8,8 @@ from django.core.management.base import BaseCommand
 
 from init_db import init_db
 from city import all_house_region_map
+from dilijan_rent_store import ensure_dilijan_region, ensure_dilijan_rent_schema
+from city import DILIJAN_LOCATION_ID, DILIJAN_LOCATION_NAME
 from house_store import ensure_house_locations, ensure_houses_schema
 from listing_history import backfill_price_history, ensure_price_history_table
 from scrape_meta import ensure_scrape_runs_table
@@ -44,6 +46,10 @@ class Command(BaseCommand):
                 if row and row[0] > 0:
                     ensure_houses_schema(connection)
                     ensure_house_locations(connection, all_house_region_map())
+                    ensure_dilijan_rent_schema(connection)
+                    ensure_dilijan_region(
+                        connection, DILIJAN_LOCATION_ID, DILIJAN_LOCATION_NAME
+                    )
                     self.stdout.write(
                         self.style.WARNING(
                             f"Rent DB already initialized at {db_path} "
@@ -51,8 +57,8 @@ class Command(BaseCommand):
                         )
                     )
                     self.stdout.write(
-                        "Ensured SCRAPE_RUNS, LISTING_PRICE_HISTORY, HOUSES tables "
-                        "and Tavush house regions exist."
+                        "Ensured SCRAPE_RUNS, LISTING_PRICE_HISTORY, HOUSES, "
+                        "DILIJAN_RENT tables and regions exist."
                     )
                     return
 

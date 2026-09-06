@@ -74,3 +74,33 @@ CREATE TABLE HOUSE_PRICE_HISTORY (
 );
 CREATE INDEX IF NOT EXISTS idx_house_price_history_listing_time
 	ON HOUSE_PRICE_HISTORY(listing_id, scraped_at);
+
+-- Dilijan long-term rent (apartments category 56 + houses category 1377)
+DROP TABLE IF EXISTS DILIJAN_RENT_PRICE_HISTORY;
+DROP TABLE IF EXISTS DILIJAN_RENT;
+CREATE TABLE DILIJAN_RENT (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	property_type TEXT NOT NULL,
+	square INTEGER,
+	is_agent INTEGER,
+	region_id INTEGER,
+	price INTEGER NOT NULL,
+	price_per_square REAL,
+	room_num INTEGER NOT NULL,
+	address TEXT NOT NULL,
+	link TEXT NOT NULL UNIQUE,
+	ddate DATE NOT NULL DEFAULT CURRENT_DATE,
+	FOREIGN KEY(region_id) REFERENCES REGION(id)
+);
+CREATE TABLE DILIJAN_RENT_PRICE_HISTORY (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	listing_id INTEGER NOT NULL,
+	price INTEGER NOT NULL,
+	price_per_square REAL,
+	scraped_at TEXT NOT NULL,
+	FOREIGN KEY(listing_id) REFERENCES DILIJAN_RENT(id)
+);
+CREATE INDEX IF NOT EXISTS idx_dilijan_rent_type
+	ON DILIJAN_RENT(property_type);
+CREATE INDEX IF NOT EXISTS idx_dilijan_rent_history_listing_time
+	ON DILIJAN_RENT_PRICE_HISTORY(listing_id, scraped_at);

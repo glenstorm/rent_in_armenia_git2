@@ -1,0 +1,114 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Dilijan rent — apartments & houses{% endblock %}
+{% block lede %}Long-term rental prices in Dilijan from list.am (apartments and houses).{% endblock %}
+
+{% block content %}
+<section class="panel row">
+  <form class="inline" method="get" action="{% url 'dilijan_rent' %}">
+    <span>Type:</span>
+    <label>
+      <input type="radio" name="type" value="all" {% if selected_type == "all" %}checked{% endif %}>
+      all
+    </label>
+    <label>
+      <input type="radio" name="type" value="apartment" {% if selected_type == "apartment" %}checked{% endif %}>
+      apartments
+    </label>
+    <label>
+      <input type="radio" name="type" value="house" {% if selected_type == "house" %}checked{% endif %}>
+      houses
+    </label>
+    <span>Y-axis:</span>
+    <label>
+      <input type="radio" name="y" value="price" {% if y == "price" %}checked{% endif %}>
+      price
+    </label>
+    <label>
+      <input type="radio" name="y" value="price_per_square" {% if y == "price_per_square" %}checked{% endif %}>
+      price per m²
+    </label>
+    <button type="submit">Update charts</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Dilijan long-term rent</h2>
+  {% if rent_stats.by_type %}
+    <ul class="district-stats">
+      {% for row in rent_stats.by_type %}
+        <li>
+          <strong>{{ row.count }}</strong>
+          <span>{{ row.name }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  <p class="meta">
+    {{ rent_stats.count }} listings. Prices stored in AMD per month
+    (USD ads converted at scrape-time rate).
+  </p>
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Compare by property type</h2>
+  {% if type_box_html %}
+    {{ type_box_html|safe }}
+  {% else %}
+    <div class="empty">
+      <p>No Dilijan rent listings yet.</p>
+      <p>Run <code>python manage.py scrape_listings</code>
+        or <code>python manage.py scrape_dilijan_rent</code>.</p>
+    </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Compare by room count</h2>
+  {% if room_box_html %}
+    {{ room_box_html|safe }}
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2 class="section-title">Listings under {{ budget_max_display }} AMD / month</h2>
+  {% if budget_listings %}
+    <div class="listing-table-wrap">
+      <table class="listing-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Type</th>
+            <th>Price</th>
+            <th>Rooms</th>
+            <th>m²</th>
+            <th>AMD/m²</th>
+            <th>Address</th>
+            <th>Link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in budget_listings %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ item.type_label }}</td>
+              <td>{{ item.price_display }}</td>
+              <td>{{ item.rooms }}</td>
+              <td>{% if item.square %}{{ item.square }}{% else %}—{% endif %}</td>
+              <td>{{ item.ppm2_display }}</td>
+              <td>{{ item.address }}</td>
+              <td>
+                <a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">
+                  open
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="meta">No listings under this budget.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -25,6 +25,7 @@ def _progress(msg):
 
 
 def _execute_scrape():
+    from dilijan_rent_scraper import run_dilijan_rent_scrape
     from house_scraper import run_house_scrape
     from scraper import run_scrape
 
@@ -33,6 +34,10 @@ def _execute_scrape():
         run_scrape(db_path=str(settings.RENT_DB_PATH), progress=_progress)
         print("Rent scrape finished; starting Tavush houses...", flush=True)
         run_house_scrape(db_path=str(settings.RENT_DB_PATH), progress=_progress)
+        print("Tavush houses finished; starting Dilijan rent...", flush=True)
+        run_dilijan_rent_scrape(
+            db_path=str(settings.RENT_DB_PATH), progress=_progress
+        )
         print("Scrape finished.", flush=True)
     except Exception:
         logger.exception("Scrape failed")

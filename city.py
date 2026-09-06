@@ -64,6 +64,12 @@ HOUSE_SEARCH_LOCATIONS = {
 # Houses for sale on list.am
 HOUSE_SALE_CATEGORY_ID = 1386
 
+# Dilijan long-term rent (list.am n=58)
+DILIJAN_LOCATION_ID = 58
+DILIJAN_LOCATION_NAME = "Dilijan"
+APARTMENT_RENT_CATEGORY_ID = 56  # same category as Yerevan flats
+HOUSE_RENT_CATEGORY_ID = 1377
+
 
 def all_house_region_map():
     """region_id → display name for every house market we store."""

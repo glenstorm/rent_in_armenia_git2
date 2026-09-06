@@ -15,6 +15,15 @@ from charts import (
     list_room_groups,
     parse_room_group,
 )
+from dilijan_rent_charts import (
+    PROPERTY_APARTMENT,
+    PROPERTY_HOUSE,
+    build_dilijan_rent_room_box_figure,
+    build_dilijan_rent_type_box_figure,
+    dilijan_rent_stats,
+    list_dilijan_rent_budget,
+)
+from dilijan_rent_store import dedupe_dilijan_rent_links, ensure_dilijan_rent_schema
 from house_charts import (
     HOUSE_BUDGET_MAX_AMD,
     HOUSE_LARGE_ROOM_GROUP,
@@ -317,3 +326,59 @@ def tavush_houses(request):
 def dilijan_houses(request):
     """Old URL — redirect to Tavush houses page."""
     return redirect("tavush_houses")
+
+
+def dilijan_rent(request):
+    y = _parse_y(request)
+    db_path = str(settings.RENT_DB_PATH)
+    with sqlite3.connect(db_path) as connection:
+        ensure_dilijan_rent_schema(connection)
+        dedupe_dilijan_rent_links(connection)
+
+    selected_type = request.GET.get("type") or "all"
+    if selected_type not in ("all", PROPERTY_APARTMENT, PROPERTY_HOUSE):
+        selected_type = "all"
+    property_types = (
+        None
+        if selected_type == "all"
+        else [selected_type]
+    )
+
+    rent_stats = dilijan_rent_stats(db_path, property_types)
+    budget_max = 400_000
+    type_box_html = ""
+    room_box_html = ""
+    budget_listings = []
+
+    if rent_stats["count"]:
+        type_fig = build_dilijan_rent_type_box_figure(
+            db_path, y=y, property_types=property_types
+        )
+        room_fig = build_dilijan_rent_room_box_figure(
+            db_path, y=y, property_types=property_types
+        )
+        type_box_html = type_fig.to_html(full_html=False, include_plotlyjs="cdn")
+        room_box_html = room_fig.to_html(full_html=False, include_plotlyjs=False)
+        budget_listings = list_dilijan_rent_budget(
+            db_path,
+            property_types=property_types,
+            max_price_amd=budget_max,
+            limit=40,
+        )
+
+    return render(
+        request,
+        "dashboard/dilijan_rent.html",
+        {
+            "nav": "dilijan_rent",
+            "y": y,
+            "selected_type": selected_type,
+            "rent_stats": rent_stats,
+            "type_box_html": type_box_html,
+            "room_box_html": room_box_html,
+            "budget_listings": budget_listings,
+            "budget_max": budget_max,
+            "budget_max_display": f"{budget_max:,}".replace(",", " "),
+            **_schedule_context(),
+        },
+    )

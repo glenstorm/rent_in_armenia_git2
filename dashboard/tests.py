@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from listam_links import normalize_listam_link
 from apartment import area_is_plausible
+from dilijan_rent import rent_price_is_plausible
 from house import house_price_is_plausible, house_rooms_are_plausible
 from house_parser import HousePageParser
 from house_store import dedupe_house_links, ensure_houses_schema
@@ -23,6 +24,11 @@ class AreaValidationTests(TestCase):
         self.assertTrue(area_is_plausible(3, 90))
         self.assertTrue(area_is_plausible(4, 120))
         self.assertTrue(area_is_plausible(5, 180))
+
+    def test_rent_price_band(self):
+        self.assertTrue(rent_price_is_plausible(150_000))
+        self.assertFalse(rent_price_is_plausible(5_000))
+        self.assertFalse(rent_price_is_plausible(50_000_000))
 
 
 class HouseValidationTests(TestCase):

@@ -37,15 +37,19 @@ def _child_text(node):
 
 
 class HouseBatch:
-    def __init__(self, location_id):
+    def __init__(self, location_id, price_check=None, region_name=None):
         self.id = location_id
-        self.name = all_house_region_map()[location_id]
+        if region_name is not None:
+            self.name = region_name
+        else:
+            self.name = all_house_region_map()[location_id]
         self.houses = []
+        self._price_check = price_check or house_price_is_plausible
 
     def add(self, house):
         if not house_rooms_are_plausible(house.room_num):
             return
-        if not house_price_is_plausible(house.price):
+        if not self._price_check(house.price):
             return
         if not house_area_is_plausible(house.square):
             return
@@ -56,8 +60,17 @@ class HousePageParser:
     """Transform a house-sale category HTML page into a HouseBatch."""
 
     @staticmethod
-    def transform(page_content, location_id, currencies, place_aliases=None):
-        batch = HouseBatch(location_id)
+    def transform(
+        page_content,
+        location_id,
+        currencies,
+        place_aliases=None,
+        price_check=None,
+        region_name=None,
+    ):
+        batch = HouseBatch(
+            location_id, price_check=price_check, region_name=region_name
+        )
         tree = html.fromstring(page_content)
         cards = _card_links(tree)
 
