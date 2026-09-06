@@ -1,9 +1,11 @@
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
+from listam_links import normalize_listam_link
 from apartment import area_is_plausible
 from house import house_price_is_plausible, house_rooms_are_plausible
 from house_parser import HousePageParser
+from house_store import dedupe_house_links, ensure_houses_schema
 from dashboard.bot_gate import SESSION_CODE_KEY, SESSION_ISSUED_KEY, SESSION_OK_KEY
 
 
@@ -128,6 +130,154 @@ class HouseValidationTests(TestCase):
         )
         self.assertEqual(len(hag.houses), 1)
         self.assertEqual(hag.houses[0].link, "https://www.list.am/ru/item/556")
+
+
+class LinkDedupeTests(TestCase):
+    def test_normalize_strips_query(self):
+        self.assertEqual(
+            normalize_listam_link("https://www.list.am/ru/item/21122302?ld_src=2"),
+            "https://www.list.am/ru/item/21122302",
+        )
+        self.assertEqual(
+            normalize_listam_link("/ru/item/21122302?ld_src=2"),
+            "https://www.list.am/ru/item/21122302",
+        )
+
+    def test_dedupe_merges_query_variants(self):
+        import sqlite3
+
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE REGION (id INTEGER PRIMARY KEY, region_name TEXT NOT NULL)"
+        )
+        ensure_houses_schema(connection)
+        connection.execute(
+            "INSERT INTO REGION (id, region_name) VALUES (58, 'Dilijan')"
+        )
+        connection.execute(
+            """
+            INSERT INTO HOUSES
+              (square, is_agent, region_id, price, price_per_square, room_num, address, link)
+            VALUES
+              (100, 0, 58, 10000000, 100000, 4, 'a',
+               'https://www.list.am/ru/item/21122302'),
+              (100, 0, 58, 11000000, 110000, 4, 'b',
+               'https://www.list.am/ru/item/21122302?ld_src=2')
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO HOUSE_PRICE_HISTORY (listing_id, price, price_per_square, scraped_at)
+            VALUES (1, 10000000, 100000, '2026-01-01'),
+                   (2, 11000000, 110000, '2026-01-02')
+            """
+        )
+        connection.commit()
+
+        removed = dedupe_house_links(connection)
+        self.assertEqual(removed, 1)
+        rows = connection.execute("SELECT id, link, price FROM HOUSES").fetchall()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1], "https://www.list.am/ru/item/21122302")
+        hist = connection.execute(
+            "SELECT listing_id FROM HOUSE_PRICE_HISTORY ORDER BY id"
+        ).fetchall()
+        self.assertEqual(hist, [(1,), (1,)])
+        connection.close()
+
+    def test_prune_removes_inactive_only(self):
+        import sqlite3
+
+        from house_store import prune_inactive_houses
+
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE REGION (id INTEGER PRIMARY KEY, region_name TEXT NOT NULL)"
+        )
+        ensure_houses_schema(connection)
+        connection.execute(
+            "INSERT INTO REGION (id, region_name) VALUES (58, 'Dilijan')"
+        )
+        connection.executemany(
+            """
+            INSERT INTO HOUSES
+              (square, is_agent, region_id, price, price_per_square, room_num, address, link)
+            VALUES (100, 0, 58, 10000000, 100000, 4, 'a', ?)
+            """,
+            [
+                ("https://www.list.am/ru/item/111",),
+                ("https://www.list.am/ru/item/222",),
+                ("https://www.list.am/ru/item/333",),
+            ],
+        )
+        connection.commit()
+
+        def fake_check(url):
+            if url.endswith("/111"):
+                return False
+            if url.endswith("/222"):
+                return True
+            return None
+
+        stats = prune_inactive_houses(
+            connection, progress=lambda *_: None, delay_sec=0, check_fn=fake_check
+        )
+        self.assertEqual(stats["removed"], 1)
+        self.assertEqual(stats["kept"], 1)
+        self.assertEqual(stats["unknown"], 1)
+        links = {
+            row[0]
+            for row in connection.execute("SELECT link FROM HOUSES").fetchall()
+        }
+        self.assertEqual(
+            links,
+            {
+                "https://www.list.am/ru/item/222",
+                "https://www.list.am/ru/item/333",
+            },
+        )
+        connection.close()
+
+    def test_delete_houses_not_seen(self):
+        import sqlite3
+
+        from house_store import delete_houses_not_seen
+
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE REGION (id INTEGER PRIMARY KEY, region_name TEXT NOT NULL)"
+        )
+        ensure_houses_schema(connection)
+        connection.execute(
+            "INSERT INTO REGION (id, region_name) VALUES (58, 'Dilijan')"
+        )
+        connection.executemany(
+            """
+            INSERT INTO HOUSES
+              (square, is_agent, region_id, price, price_per_square, room_num, address, link)
+            VALUES (100, 0, 58, 10000000, 100000, 4, 'a', ?)
+            """,
+            [
+                ("https://www.list.am/ru/item/111",),
+                ("https://www.list.am/ru/item/222?ld_src=2",),
+                ("https://www.list.am/ru/item/333",),
+            ],
+        )
+        connection.commit()
+        removed = delete_houses_not_seen(
+            connection,
+            58,
+            {"https://www.list.am/ru/item/111", "https://www.list.am/ru/item/222"},
+        )
+        self.assertEqual(removed, 1)
+        links = {
+            row[0]
+            for row in connection.execute("SELECT link FROM HOUSES").fetchall()
+        }
+        self.assertIn("https://www.list.am/ru/item/111", links)
+        self.assertTrue(any("222" in link for link in links))
+        self.assertFalse(any("333" in link for link in links))
+        connection.close()
 
 
 @override_settings(BOT_GATE_ENABLED=True, BOT_GATE_MIN_SOLVE_SECONDS=0)

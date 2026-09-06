@@ -5,12 +5,15 @@ import time
 
 from city import DISTRICTS, scrape_district_ids
 from currency_rates import CurrencyRates
+from district import dedupe_listing_links
 from page_parser import PageParser
 from listing_history import backfill_price_history, ensure_price_history_table
 from scrape_meta import ensure_scrape_runs_table, record_scrape_run
 from web_page import WebPage
 
 REQUEST_DELAY_SEC = 2.0
+# Safety cap only (Kentron/Arabkir exceed 20). Normal stop is empty page / 0 listings.
+MAX_CATEGORY_PAGES = 500
 
 
 def process_page(district_num, page_num):
@@ -32,6 +35,9 @@ def run_scrape(db_path="real_estate.db", progress=print):
         with sqlite3.connect(db_path) as connection:
             ensure_scrape_runs_table(connection)
             ensure_price_history_table(connection)
+            removed = dedupe_listing_links(connection)
+            if removed:
+                progress(f"Removed {removed} duplicate flat listing(s) by link")
             backfill_price_history(connection)
             progress("Loading currency rates...")
             currencies = rates.get_rates(connection)
@@ -42,8 +48,9 @@ def run_scrape(db_path="real_estate.db", progress=print):
                 name = DISTRICTS[district_id]
                 progress(f"\n[{index}/{len(district_ids)}] {name} (n={district_id})")
                 district_saved = 0
+                page_num = 1
 
-                for page_num in range(1, 21):
+                while page_num <= MAX_CATEGORY_PAGES:
                     if page_num > 1 or index > 1:
                         time.sleep(REQUEST_DELAY_SEC)
 
@@ -63,6 +70,11 @@ def run_scrape(db_path="real_estate.db", progress=print):
                     district_saved += count
                     total_saved += count
                     progress(f"  {count} listings")
+                    page_num += 1
+                else:
+                    progress(
+                        f"  reached safety page limit ({MAX_CATEGORY_PAGES}); stopping"
+                    )
 
                 progress(f"  done: {district_saved} listings from {name}")
     finally:

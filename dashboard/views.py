@@ -27,6 +27,7 @@ from house_charts import (
     rank_best_buys,
     tavush_location_names,
 )
+from house_store import dedupe_house_links, ensure_houses_schema
 from dashboard.bot_gate import (
     captcha_code,
     check_answer,
@@ -231,6 +232,9 @@ def distribution(request):
 def tavush_houses(request):
     y = _parse_y(request)
     db_path = str(settings.RENT_DB_PATH)
+    with sqlite3.connect(db_path) as connection:
+        ensure_houses_schema(connection)
+        dedupe_house_links(connection)
     towns = tavush_location_names()
     selected_town = request.GET.get("town") or "all"
     if selected_town != "all" and selected_town not in towns:

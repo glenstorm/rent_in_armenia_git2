@@ -4,8 +4,22 @@ import numpy as np
 
 from apartment import area_is_plausible
 from city import district_name
+from listam_links import (
+    dedupe_table_by_link,
+    find_listing_id_by_link,
+    normalize_listam_link,
+)
 from listing_history import record_price_history
 
+
+def dedupe_listing_links(connection):
+    """Collapse REAL_ESTATE rows that differ only by ?ld_src=… etc."""
+    return dedupe_table_by_link(
+        connection,
+        table="REAL_ESTATE",
+        history_table="LISTING_PRICE_HISTORY",
+        listing_fk="listing_id",
+    )
 
 class District:
     """
@@ -100,13 +114,9 @@ class District:
         scraped_at = datetime.now(timezone.utc).isoformat()
 
         for x in self.apartments:
-            cur.execute(
-                "SELECT id FROM REAL_ESTATE WHERE link = ? LIMIT 1",
-                (x.link,),
-            )
-            row = cur.fetchone()
-            if row:
-                listing_id = row[0]
+            link = normalize_listam_link(x.link) or x.link
+            listing_id = find_listing_id_by_link(cur, "REAL_ESTATE", link)
+            if listing_id:
                 cur.execute(
                     """
                     UPDATE REAL_ESTATE
@@ -116,7 +126,8 @@ class District:
                         price = ?,
                         price_per_square = ?,
                         room_num = ?,
-                        address = ?
+                        address = ?,
+                        link = ?
                     WHERE id = ?
                     """,
                     (
@@ -127,6 +138,7 @@ class District:
                         x.price_per_square,
                         x.room_num,
                         x.address,
+                        link,
                         listing_id,
                     ),
                 )
@@ -145,7 +157,7 @@ class District:
                         x.price_per_square,
                         x.room_num,
                         x.address,
-                        x.link,
+                        link,
                     ),
                 )
                 listing_id = cur.lastrowid

@@ -11,6 +11,7 @@ from house import (
     house_price_is_plausible,
     house_rooms_are_plausible,
 )
+from listam_links import normalize_listam_link
 
 
 def _card_links(tree):
@@ -20,17 +21,19 @@ def _card_links(tree):
     )
 
 
+def extract_item_links(page_content):
+    """Canonical item URLs present on a category page (parse-independent)."""
+    tree = html.fromstring(page_content)
+    links = set()
+    for card in _card_links(tree):
+        link = normalize_listam_link(card.get("href"))
+        if link:
+            links.add(link)
+    return links
+
+
 def _child_text(node):
     return (node.text_content() or "").strip()
-
-
-def _normalize_item_link(href):
-    if not href:
-        return None
-    path = href.split("?", 1)[0]
-    if path.startswith("http"):
-        return path
-    return "https://www.list.am" + path
 
 
 class HouseBatch:
@@ -62,7 +65,7 @@ class HousePageParser:
             price_text = None
             where = None
             title = None
-            link = _normalize_item_link(card.get("href"))
+            link = normalize_listam_link(card.get("href"))
             if not link:
                 continue
 

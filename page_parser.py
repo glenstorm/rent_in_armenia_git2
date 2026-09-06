@@ -3,6 +3,7 @@ import re
 
 from apartment import Apartment, area_is_plausible
 from district import District
+from listam_links import normalize_listam_link
 
 
 def _card_links(tree):
@@ -15,15 +16,6 @@ def _card_links(tree):
 
 def _child_text(node):
     return (node.text_content() or "").strip()
-
-
-def _normalize_item_link(href):
-    if not href:
-        return None
-    path = href.split("?", 1)[0]
-    if path.startswith("http"):
-        return path
-    return "https://www.list.am" + path
 
 
 def _parse_price_amd(price_text, currencies):
@@ -104,7 +96,7 @@ class PageParser:
             price = None
             where = None
             title = None
-            link = _normalize_item_link(apart.get("href"))
+            link = normalize_listam_link(apart.get("href"))
             if not link:
                 continue
 

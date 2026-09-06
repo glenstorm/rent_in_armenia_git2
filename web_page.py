@@ -30,6 +30,12 @@ class WebPage:
     ]
 
     @staticmethod
+    def _opener():
+        opener = request.build_opener()
+        opener.addheaders = list(WebPage._HEADERS)
+        return opener
+
+    @staticmethod
     def _normalize_path(url):
         path = urlsplit(url).path.rstrip("/")
         if path.startswith("/ru/"):
@@ -39,6 +45,11 @@ class WebPage:
         return path
 
     @staticmethod
+    def _is_item_path(url):
+        path = WebPage._normalize_path(url)
+        return "/item/" in path
+
+    @staticmethod
     def _is_end_of_results(requested_url, final_url):
         """Past the last listing page, list.am redirects away from /category/56/{page}."""
         return WebPage._normalize_path(requested_url) != WebPage._normalize_path(
@@ -46,9 +57,52 @@ class WebPage:
         )
 
     @staticmethod
+    def item_is_active(url, max_retries=3, retry_delay=2.0):
+        """
+        Check whether a list.am item page is still published.
+
+        Returns:
+            True  – page exists
+            False – gone (404/410 or redirected away from /item/)
+            None  – unknown (network / rate-limit); do not delete
+        """
+        opener = WebPage._opener()
+        for attempt in range(max_retries):
+            try:
+                response = opener.open(url, timeout=30)
+                try:
+                    final_url = response.geturl()
+                finally:
+                    response.close()
+                if not WebPage._is_item_path(final_url):
+                    return False
+                return True
+            except HTTPError as e:
+                if e.code in (404, 410, 451):
+                    return False
+                if e.code in (403, 429) and attempt + 1 < max_retries:
+                    retry_after = e.headers.get("Retry-After")
+                    try:
+                        wait = (
+                            float(retry_after)
+                            if retry_after
+                            else retry_delay * (2**attempt)
+                        )
+                    except ValueError:
+                        wait = retry_delay * (2**attempt)
+                    time.sleep(min(wait, 60.0))
+                    continue
+                return None
+            except (URLError, OSError, ValueError):
+                if attempt + 1 < max_retries:
+                    time.sleep(retry_delay * (2**attempt))
+                    continue
+                return None
+        return None
+
+    @staticmethod
     def download(url, max_retries=6, retry_delay=5.0):
-        opener = request.build_opener()
-        opener.addheaders = list(WebPage._HEADERS)
+        opener = WebPage._opener()
         request.install_opener(opener)
 
         for attempt in range(max_retries):
