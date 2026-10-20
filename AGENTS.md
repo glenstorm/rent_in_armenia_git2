@@ -12,7 +12,15 @@ Django dashboard + list.am scrapers for:
 
 Layout is a **flat Python/Django tree** (not a multi-service monorepo). Prefer small, focused modules next to existing patterns (`scraper.py`, `house_scraper.py`, `dilijan_rent_scraper.py`, `dashboard/`).
 
-Use the project venv: `.\venv\Scripts\python.exe`.
+Use the project venv: `.\venv\Scripts\python.exe` on Windows, or `venv/bin/python` on Linux.
+
+## Cloud Agent
+
+The Cloud Agent image is Ubuntu with system Python 3.12. Environment install creates `venv/` from `requirements.txt`.
+
+- Tests: `venv/bin/python manage.py test`
+- On boot, start runs `migrate`, `setup_db`, and `runserver` at http://127.0.0.1:8000/
+- Public pages require the CAPTCHA at `/verify/` (`BOT_GATE_ENABLED` defaults on)
 
 ## How to work
 
